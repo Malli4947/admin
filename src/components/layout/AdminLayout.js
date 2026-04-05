@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import  { useState } from 'react';
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../Context/AuthContext';
 import { useTheme } from '../../Context/ThemeContext';
@@ -16,7 +16,7 @@ const NAV = [
 
 export default function AdminLayout() {
   const { admin, logout }         = useAuth();
-  const { theme, toggle, isDark } = useTheme();
+  const {  toggle, isDark } = useTheme();
   const navigate                  = useNavigate();
   const location                  = useLocation();
   const [collapsed,  setCollapsed]  = useState(false);

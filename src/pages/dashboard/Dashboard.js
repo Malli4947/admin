@@ -168,10 +168,7 @@ export default function Dashboard() {
   const recentProp = data?.recentProperties || [];
   const charts     = data?.charts           || {};
 
-  // Top properties sorted by views descending
-  const topProps = [...recentProp]
-    .sort((a, b) => (b.views || 0) - (a.views || 0))
-    .slice(0, 5);
+ 
 
   // ── Stat cards
   // ✅ API uses "newUsersToday" not "newEnquiriesToday"
