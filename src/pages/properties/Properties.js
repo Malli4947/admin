@@ -139,7 +139,7 @@ export default function Properties() {
   // ── Fetch stats ────────────────────────────────────────────
   const fetchStats = useCallback(async () => {
     try {
-      const data = await api.get('/properties/stats');
+      const data = await api.get('/api/properties/stats');
       if (data.success) setStats(data.stats);
     } catch { /* silent */ }
   }, []);
@@ -236,8 +236,8 @@ export default function Properties() {
     setSaving(true);
     try {
       const data = editing
-        ? await api.put(`/properties/${editing._id}`, payload)
-        : await api.post('/properties', payload);
+        ? await api.put(`/api/properties/${editing._id}`, payload)
+        : await api.post('/api/properties', payload);
 
       if (data.success) {
         showToast(editing ? 'Property updated!' : 'Property created!');
@@ -255,7 +255,7 @@ export default function Properties() {
   const handleDelete = async () => {
     setSaving(true);
     try {
-      const data = await api.delete(`/properties/${editing._id}`);
+      const data = await api.delete(`/api/properties/${editing._id}`);
       if (data.success) {
         showToast('Property removed');
         closeModal();
@@ -270,9 +270,9 @@ export default function Properties() {
 
   const handleRestore = async (p) => {
     try {
-      const data = await api.put(`/properties/${p._id}`, { isActive: true });
+      const data = await api.put(`/api/properties/${p._id}`, { isActive: true });
       if (data.success) {
-        showToast('Property restored ✅');
+        showToast('Property restored ✅');  
         fetchProperties();
         fetchStats();
       }
@@ -283,7 +283,7 @@ export default function Properties() {
   const toggleField = async (p, field) => {
     const update = { [field]: !p[field] };
     try {
-      const data = await api.put(`/properties/${p._id}`, update);
+      const data = await api.put(`/api/properties/${p._id}`, update);
       if (data.success) {
         setProperties(prev => prev.map(x => x._id === p._id ? { ...x, [field]: !x[field] } : x));
         if (field === 'featured') fetchStats();

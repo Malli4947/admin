@@ -87,7 +87,7 @@ export default function CMS() {
   const loadCMS = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await api.get('/cms');
+      const data = await api.get('/api/cms');
       if (data.success) {
         // Merge with defaults so every key always exists
         const merged = {
@@ -113,7 +113,7 @@ export default function CMS() {
   // ── Save a CMS section (upsert via POST /api/cms)
   const saveSection = async (key, value, label) => {
     try {
-      const data = await api.post('/cms', { key, value, label });
+      const data = await api.post('/api/cms', { key, value, label });
       if (data.success) {
         setCms(prev => ({ ...prev, [key]: value }));
         showToast(`${label || key} saved successfully!`);
