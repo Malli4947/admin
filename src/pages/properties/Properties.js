@@ -268,7 +268,6 @@ export default function Properties() {
     setSaving(false);
   };
 
-  // ── Restore deleted property ───────────────────────────────
   const handleRestore = async (p) => {
     try {
       const data = await api.put(`/properties/${p._id}`, { isActive: true });
