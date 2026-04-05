@@ -98,7 +98,7 @@ export default function Users() {
       p.set('limit', PER);
 
       // ✅ Correct path: /api/admin/users
-      const data = await api.get(`/admin/users?${p.toString()}`);
+      const data = await api.get(`/api/admin/users?${p.toString()}`);
       if (data.success) {
         setUsers(data.users || []);
         setTotal(data.total || 0);
@@ -152,7 +152,7 @@ export default function Users() {
     setSaving(true);
     try {
       // ✅ Correct path: /api/auth/register
-      const data = await api.post('/auth/register', {
+      const data = await api.post('/api/auth/register', {
         name:     form.name.trim(),
         email:    form.email.trim(),
         phone:    form.phone.trim(),
@@ -163,7 +163,7 @@ export default function Users() {
         // Assign non-user role if needed
         if (form.role !== 'user' && data.user?._id) {
           // ✅ Correct path: /api/admin/users/:id
-          await api.put(`/admin/users/${data.user._id}`, { role: form.role });
+          await api.put(`/api/admin/users/${data.user._id}`, { role: form.role });
         }
         showToast('User created successfully!');
         closeModal();
@@ -195,7 +195,7 @@ export default function Users() {
     setSaving(true);
     try {
       // ✅ Correct path: /api/admin/users/:id
-      const data = await api.put(`/admin/users/${sel._id}`, payload);
+      const data = await api.put(`/api/admin/users/${sel._id}`, payload);
       if (data.success) {
         showToast('User updated!');
         closeModal();
@@ -215,7 +215,7 @@ export default function Users() {
     setSaving(true);
     try {
       // Both admin and superadmin can deactivate — backend DELETE now allows both roles
-      const data = await api.delete(`/admin/users/${sel._id}`);
+      const data = await api.delete(`/api/admin/users/${sel._id}`);
 
       if (data.success) {
         showToast('User deactivated');
@@ -235,7 +235,7 @@ export default function Users() {
     if (u._id === admin?._id) return showToast("You can't deactivate yourself", 'error');
     try {
       // ✅ Correct path: /api/admin/users/:id
-      const data = await api.put(`/admin/users/${u._id}`, { isActive: !u.isActive });
+      const data = await api.put(`/api/admin/users/${u._id}`, { isActive: !u.isActive });
       if (data.success) {
         setUsers(prev => prev.map(x => x._id === u._id ? { ...x, isActive: !x.isActive } : x));
         showToast(u.isActive ? 'User deactivated' : 'User activated');
@@ -253,7 +253,7 @@ export default function Users() {
     const newRole = u.role === 'user' ? 'admin' : 'user';
     try {
       // ✅ Correct path: /api/admin/users/:id
-      const data = await api.put(`/admin/users/${u._id}`, { role: newRole });
+      const data = await api.put(`/api/admin/users/${u._id}`, { role: newRole });
       if (data.success) {
         setUsers(prev => prev.map(x => x._id === u._id ? { ...x, role: newRole } : x));
         showToast(`Role changed to ${newRole}`);

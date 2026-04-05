@@ -99,7 +99,7 @@ export default function Enquiries() {
       p.set('page',  page);
       p.set('limit', PER);
 
-      const data = await api.get(`/enquiries?${p.toString()}`);
+      const data = await api.get(`/api/enquiries?${p.toString()}`);
       if (data.success) {
         setEnquiries(data.enquiries || []);
         setTotal(data.total || 0);
@@ -116,7 +116,7 @@ export default function Enquiries() {
   // ── Fetch stats
   const fetchStats = useCallback(async () => {
     try {
-      const data = await api.get('/enquiries/stats');
+      const data = await api.get('/api/enquiries/stats');
       if (data.success) setStats(data.stats);
     } catch { /* silent */ }
   }, []);
@@ -138,7 +138,7 @@ export default function Enquiries() {
     setModal('view');
     if (enq.status === 'new') {
       try {
-        const data = await api.put(`/enquiries/${enq._id}`, { status: 'read' });
+        const data = await api.put(`/api/enquiries/${enq._id}`, { status: 'read' });
         if (data.success) {
           setEnquiries(prev => prev.map(e => e._id === enq._id ? { ...e, status: 'read' } : e));
           setSel(s => ({ ...s, status: 'read' }));
@@ -151,7 +151,7 @@ export default function Enquiries() {
   // ── Update status (inline dropdown OR modal buttons)
   const updateStatus = async (id, status) => {
     try {
-      const data = await api.put(`/enquiries/${id}`, { status });
+      const data = await api.put(`/api/enquiries/${id}`, { status });
       if (data.success) {
         setEnquiries(prev => prev.map(e => e._id === id ? { ...e, status } : e));
         if (sel?._id === id) setSel(s => ({ ...s, status }));
@@ -170,7 +170,7 @@ export default function Enquiries() {
     if (!newOnes.length) return showToast('No new enquiries to mark', 'error');
     setSaving(true);
     try {
-      await Promise.all(newOnes.map(e => api.put(`/enquiries/${e._id}`, { status: 'read' })));
+      await Promise.all(newOnes.map(e => api.put(`/api/enquiries/${e._id}`, { status: 'read' })));
       showToast(`${newOnes.length} marked as read`);
       fetchEnquiries();
       fetchStats();
@@ -185,7 +185,7 @@ export default function Enquiries() {
     if (!sel) return;
     setSaving(true);
     try {
-      const data = await api.put(`/enquiries/${sel._id}`, { notes });
+      const data = await api.put(`/api/enquiries/${sel._id}`, { notes });
       if (data.success) {
         setEnquiries(prev => prev.map(e => e._id === sel._id ? { ...e, notes } : e));
         showToast('Notes saved successfully');
@@ -204,7 +204,7 @@ export default function Enquiries() {
     if (!sel) return;
     setSaving(true);
     try {
-      const data = await api.delete(`/enquiries/${sel._id}`);
+      const data = await api.delete(`/api/enquiries/${sel._id}`);
       if (data.success) {
         showToast('Enquiry deleted');
         setModal(null);

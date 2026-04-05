@@ -121,7 +121,7 @@ export default function Properties() {
       p.set('page',  page);
       p.set('limit', PER);
 
-      const data = await api.get(`/properties?${p.toString()}`);
+      const data = await api.get(`/api/properties?${p.toString()}`);
 
       if (data.success) {
         setProperties(data.properties || []);
