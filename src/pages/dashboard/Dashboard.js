@@ -105,7 +105,7 @@ export default function Dashboard() {
     setLoading(true);
     setError('');
     try {
-      const res = await api.get('/admin/dashboard');
+      const res = await api.get('/api/admin/dashboard');
 
       if (res.success) {
         // ── Normalise the response into a consistent shape ────────────────
