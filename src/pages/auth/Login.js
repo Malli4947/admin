@@ -28,7 +28,7 @@ const handleSubmit = async (e) => {
   setLoading(true);
 
   try {
-    const res = await api.post('/api/auth/admin/login', {
+    const res = await api.post('/auth/admin/login', {
       email: form.email,
       password: form.password
     });

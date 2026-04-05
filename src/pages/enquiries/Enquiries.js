@@ -170,7 +170,7 @@ export default function Enquiries() {
     if (!newOnes.length) return showToast('No new enquiries to mark', 'error');
     setSaving(true);
     try {
-      await Promise.all(newOnes.map(e => api.put(`/api/enquiries/${e._id}`, { status: 'read' })));
+      await Promise.all(newOnes.map(e => api.put(`/enquiries/${e._id}`, { status: 'read' })));
       showToast(`${newOnes.length} marked as read`);
       fetchEnquiries();
       fetchStats();
