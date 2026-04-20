@@ -523,8 +523,8 @@ export default function Users() {
 
       {/* ══ VIEW MODAL ════════════════════════════════════ */}
       {modal === 'view' && sel && (
-        <Modal title="👤 User Details" onClose={closeModal}>
-          <div className="modal__body">
+        <Modal title="👤 User Details" onClose={closeModal} style={{paddingTop:80}}>
+          <div className="modal__body" >
             <div className="user-view">
               <div className="user-view__av"
                 style={{ background: ROLE_AVATAR_BG[sel.role] || ROLE_AVATAR_BG.user }}>

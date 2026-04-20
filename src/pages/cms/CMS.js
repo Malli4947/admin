@@ -10,7 +10,6 @@ const TABS = [
   { id: 'banners', label: 'Banners',        icon: '🎨' },
 ];
 
-// Default fallback values when CMS keys are not yet in DB
 const DEFAULTS = {
   hero: {
     title: 'Find Your Dream Property in Hyderabad',
@@ -69,27 +68,166 @@ function Toast({ msg, type = 'success', onClose }) {
   );
 }
 
+// ── ✅ Single Image Upload component ──────────────────────────
+// Props:
+//   value      — current image URL string
+//   onChange   — called with new URL after upload
+//   label      — field label text
+//   inputId    — unique id for the file input (required, must be unique per usage)
+function SingleImageUpload({ value, onChange, label = 'Image', inputId }) {
+  const [uploading, setUploading] = useState(false);
+  const [error,     setError]     = useState('');
+
+  const handleFile = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate size (5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      setError('File too large — max 5 MB');
+      e.target.value = '';
+      return;
+    }
+
+    setError('');
+    setUploading(true);
+
+    try {
+      const formData = new FormData();
+      formData.append('image', file);   // ✅ single field name: "image"
+
+      const res = await fetch('http://localhost:3000/api/upload/image', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('pp_admin_token')}`,
+          // ✅ No Content-Type — browser sets it automatically for FormData
+        },
+        body: formData,
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        onChange(data.url);   // ✅ pass new S3 URL up to parent
+      } else {
+        setError(data.message || 'Upload failed');
+      }
+    } catch {
+      setError('Network error — upload failed');
+    }
+
+    setUploading(false);
+    e.target.value = '';  // reset so same file can be re-selected
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <label className="form-label">{label}</label>
+
+      {/* ── Current image preview + change button ── */}
+      {value ? (
+        <div style={{ position: 'relative', borderRadius: 10, overflow: 'hidden', border: '1px solid var(--bdr2)' }}>
+          <img
+            src={value}
+            alt="preview"
+            style={{ width: '100%', height: 160, objectFit: 'cover', display: 'block' }}
+          />
+          {/* Overlay with change/remove buttons */}
+          <div style={{
+            position: 'absolute', inset: 0,
+            background: 'rgba(0,0,0,0.45)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+            opacity: 0, transition: 'opacity 0.2s',
+          }}
+            onMouseEnter={e => e.currentTarget.style.opacity = 1}
+            onMouseLeave={e => e.currentTarget.style.opacity = 0}
+          >
+            {/* Change image */}
+            <label htmlFor={inputId} style={{
+              background: '#2563EB', color: '#fff', border: 'none',
+              borderRadius: 8, padding: '7px 16px', fontSize: 13,
+              fontWeight: 600, cursor: uploading ? 'not-allowed' : 'pointer',
+              display: 'flex', alignItems: 'center', gap: 5,
+            }}>
+              {uploading ? '⏳ Uploading…' : '🔄 Change'}
+            </label>
+            {/* Remove */}
+            <button
+              onClick={() => onChange('')}
+              style={{
+                background: 'rgba(220,38,38,0.85)', color: '#fff', border: 'none',
+                borderRadius: 8, padding: '7px 14px', fontSize: 13,
+                fontWeight: 600, cursor: 'pointer',
+              }}
+            >✕ Remove</button>
+          </div>
+        </div>
+      ) : (
+        /* ── Empty drop zone ── */
+        <label htmlFor={inputId} style={{
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+          gap: 8, border: '2px dashed var(--bdr2)', borderRadius: 10,
+          padding: '28px 16px',
+          cursor: uploading ? 'not-allowed' : 'pointer',
+          background: uploading ? 'var(--bg2)' : 'var(--bg3)',
+          opacity: uploading ? 0.7 : 1,
+          transition: 'background 0.2s',
+        }}>
+          <span style={{ fontSize: 30 }}>{uploading ? '⏳' : '📁'}</span>
+          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--t1)' }}>
+            {uploading ? 'Uploading…' : 'Click to upload image'}
+          </span>
+          <span style={{ fontSize: 11, color: 'var(--t3)' }}>
+            JPEG, PNG, WEBP · Max 5 MB
+          </span>
+        </label>
+      )}
+
+      {/* Hidden file input */}
+      <input
+        id={inputId}
+        type="file"
+        accept="image/*"
+        style={{ display: 'none' }}
+        disabled={uploading}
+        onChange={handleFile}
+      />
+
+      {/* Also allow pasting a URL manually */}
+      {/* <input
+        className="form-input"
+        placeholder="…or paste image URL directly"
+        value={value || ''}
+        onChange={e => onChange(e.target.value)}
+        style={{ fontSize: 12 }}
+      /> */}
+
+      {/* Error */}
+      {error && (
+        <span style={{ fontSize: 12, color: 'var(--red)' }}>❌ {error}</span>
+      )}
+    </div>
+  );
+}
+
 // ── Main CMS component ────────────────────────────────────────
 export default function CMS() {
   const [tab,     setTab]     = useState('hero');
-  const [cms,     setCms]     = useState(null);     // null = loading
+  const [cms,     setCms]     = useState(null);
   const [loading, setLoading] = useState(true);
   const [toast,   setToast]   = useState(null);
 
-  // Banner modal state (lives here so it persists across tab re-renders)
   const [bannerModal, setBannerModal] = useState(false);
   const [editBanner,  setEditBanner]  = useState(null);
   const [bForm,       setBForm]       = useState({ title: '', subtitle: '', image: '', isActive: true });
 
   const showToast = (msg, type = 'success') => setToast({ msg, type });
 
-  // ── Load ALL CMS data on mount
   const loadCMS = useCallback(async () => {
     setLoading(true);
     try {
       const data = await api.get('/api/cms');
       if (data.success) {
-        // Merge with defaults so every key always exists
         const merged = {
           hero:    { ...DEFAULTS.hero,    ...(data.cms?.hero    || {}) },
           about:   { ...DEFAULTS.about,   ...(data.cms?.about   || {}) },
@@ -110,7 +248,6 @@ export default function CMS() {
 
   useEffect(() => { loadCMS(); }, [loadCMS]);
 
-  // ── Save a CMS section (upsert via POST /api/cms)
   const saveSection = async (key, value, label) => {
     try {
       const data = await api.post('/api/cms', { key, value, label });
@@ -128,7 +265,6 @@ export default function CMS() {
     }
   };
 
-  // ── Loading state
   if (loading || !cms) {
     return (
       <div className="page a-up">
@@ -163,11 +299,6 @@ export default function CMS() {
       setSaving(true);
       await saveSection('hero', form, 'Hero Section');
       setSaving(false);
-      setChanged(false);
-    };
-
-    const handleReset = () => {
-      setForm({ ...cms.hero });
       setChanged(false);
     };
 
@@ -218,17 +349,22 @@ export default function CMS() {
               value={form.ctaText || ''}
               onChange={e => handleChange('ctaText', e.target.value)} />
           </div>
+
+          {/* ✅ Background image — upload or paste URL */}
           <div className="form-group">
-            <label className="form-label">Background Image URL</label>
-            <input className="form-input"
-              placeholder="https://images.unsplash.com/…"
+            <SingleImageUpload
+              inputId="hero-bg-upload"
+              label="Background Image"
               value={form.backgroundImage || ''}
-              onChange={e => handleChange('backgroundImage', e.target.value)} />
+              onChange={val => handleChange('backgroundImage', val)}
+            />
           </div>
         </div>
 
         <div className="cms-actions">
-          <button className="btn btn-ghost" onClick={handleReset} disabled={!changed}>Reset</button>
+          <button className="btn btn-ghost"
+            onClick={() => { setForm({ ...cms.hero }); setChanged(false); }}
+            disabled={!changed}>Reset</button>
           <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
             {saving ? <><span className="spinner" /> Saving…</> : '💾 Save Hero'}
           </button>
@@ -309,10 +445,21 @@ export default function CMS() {
               value={form.address || ''}
               onChange={e => handleChange('address', e.target.value)} />
           </div>
+
+          <div className="form-group cms-form-full">
+            <SingleImageUpload
+              inputId="about-img-upload"
+              label="About Section Image"
+              value={form.image || ''}
+              onChange={val => handleChange('image', val)}
+            />
+          </div>
         </div>
 
         <div className="cms-actions">
-          <button className="btn btn-ghost" onClick={() => { setForm({ ...cms.about }); setChanged(false); }} disabled={!changed}>Reset</button>
+          <button className="btn btn-ghost"
+            onClick={() => { setForm({ ...cms.about }); setChanged(false); }}
+            disabled={!changed}>Reset</button>
           <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
             {saving ? <><span className="spinner" /> Saving…</> : '💾 Save About'}
           </button>
@@ -357,7 +504,6 @@ export default function CMS() {
           {changed && <span className="badge badge-amber">Unsaved changes</span>}
         </div>
 
-        {/* Google preview */}
         <div className="seo-preview">
           <div className="seo-preview__lbl">Google Search Preview</div>
           <div className="seo-preview__url">https://primepro.in/</div>
@@ -377,7 +523,6 @@ export default function CMS() {
               onChange={e => handleChange('metaTitle', e.target.value)} />
             {cc.t > 60 && <span className="form-error">Title is too long — Google may truncate it</span>}
           </div>
-
           <div className="form-group cms-form-full">
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
               <label className="form-label">Meta Description</label>
@@ -389,7 +534,6 @@ export default function CMS() {
               onChange={e => handleChange('metaDescription', e.target.value)} />
             {cc.d > 160 && <span className="form-error">Description is too long — Google may truncate it</span>}
           </div>
-
           <div className="form-group cms-form-full">
             <label className="form-label">Keywords (comma separated)</label>
             <input className="form-input"
@@ -397,15 +541,15 @@ export default function CMS() {
               value={form.keywords || ''}
               onChange={e => handleChange('keywords', e.target.value)} />
           </div>
-
           <div className="form-group">
-            <label className="form-label">OG Image URL (social share)</label>
-            <input className="form-input"
-              placeholder="https://primepro.in/og-image.jpg"
+            {/* ✅ OG Image — upload or paste */}
+            <SingleImageUpload
+              inputId="seo-og-upload"
+              label="OG Image (social share)"
               value={form.ogImage || ''}
-              onChange={e => handleChange('ogImage', e.target.value)} />
+              onChange={val => handleChange('ogImage', val)}
+            />
           </div>
-
           <div className="form-group">
             <label className="form-label">Canonical URL</label>
             <input className="form-input"
@@ -417,7 +561,10 @@ export default function CMS() {
 
         <div className="cms-actions">
           <button className="btn btn-ghost"
-            onClick={() => { setForm({ ...cms.seo }); setChanged(false); setCC({ t: (cms.seo.metaTitle||'').length, d: (cms.seo.metaDescription||'').length }); }}
+            onClick={() => {
+              setForm({ ...cms.seo }); setChanged(false);
+              setCC({ t: (cms.seo.metaTitle||'').length, d: (cms.seo.metaDescription||'').length });
+            }}
             disabled={!changed}>Reset</button>
           <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
             {saving ? <><span className="spinner" /> Saving…</> : '💾 Save SEO'}
@@ -431,8 +578,8 @@ export default function CMS() {
   // BANNERS TAB
   // ─────────────────────────────────────────────────────────
   function BannersTab() {
-    const [banners,  setBanners]  = useState(Array.isArray(cms.banners) ? [...cms.banners] : []);
-    const [saving,   setSaving]   = useState(false);
+    const [banners, setBanners] = useState(Array.isArray(cms.banners) ? [...cms.banners] : []);
+    const [saving,  setSaving]  = useState(false);
 
     const persistBanners = async (updatedBanners) => {
       setSaving(true);
@@ -488,9 +635,7 @@ export default function CMS() {
             setEditBanner(null);
             setBForm({ title: '', subtitle: '', image: '', isActive: true });
             setBannerModal(true);
-          }}>
-            + Add Banner
-          </button>
+          }}>+ Add Banner</button>
         </div>
 
         <div className="cms-banners-grid">
@@ -525,7 +670,6 @@ export default function CMS() {
             </div>
           ))}
 
-          {/* Add new button */}
           <button className="banner-add" onClick={() => {
             setEditBanner(null);
             setBForm({ title: '', subtitle: '', image: '', isActive: true });
@@ -555,23 +699,13 @@ export default function CMS() {
                   value={bForm.subtitle}
                   onChange={e => setBForm(f => ({ ...f, subtitle: e.target.value }))} />
               </div>
-              <div className="form-group">
-                <label className="form-label">Image URL</label>
-                <input className="form-input" placeholder="https://images.unsplash.com/…"
-                  value={bForm.image}
-                  onChange={e => setBForm(f => ({ ...f, image: e.target.value }))} />
-              </div>
 
-              {/* Banner preview */}
-              {bForm.image && (
-                <div className="banner-preview">
-                  <img src={bForm.image} alt="preview" />
-                  <div className="banner-preview__txt">
-                    <div className="banner-preview__title">{bForm.title || 'Title'}</div>
-                    <div className="banner-preview__sub">{bForm.subtitle || 'Subtitle'}</div>
-                  </div>
-                </div>
-              )}
+              <SingleImageUpload
+                inputId="banner-img-upload"
+                label="Banner Image"
+                value={bForm.image || ''}
+                onChange={val => setBForm(f => ({ ...f, image: val }))}
+              />
 
               <label className="check-label">
                 <input type="checkbox" checked={bForm.isActive}
@@ -584,10 +718,7 @@ export default function CMS() {
                 onClick={() => { setBannerModal(false); setEditBanner(null); }}>Cancel
               </button>
               <button className="btn btn-primary" onClick={handleBannerSave} disabled={saving}>
-                {saving
-                  ? <><span className="spinner" /> Saving…</>
-                  : editBanner ? '💾 Save Changes' : '+ Add Banner'
-                }
+                {saving ? <><span className="spinner" /> Saving…</> : editBanner ? '💾 Save Changes' : '+ Add Banner'}
               </button>
             </div>
           </Modal>
@@ -609,21 +740,15 @@ export default function CMS() {
         </button>
       </div>
 
-      {/* Tab bar */}
       <div className="cms-tabs">
         {TABS.map(t => (
-          <button
-            key={t.id}
-            className={`cms-tab${tab === t.id ? ' active' : ''}`}
-            onClick={() => setTab(t.id)}
-          >
-            <span>{t.icon}</span>
-            {t.label}
+          <button key={t.id} className={`cms-tab${tab === t.id ? ' active' : ''}`}
+            onClick={() => setTab(t.id)}>
+            <span>{t.icon}</span>{t.label}
           </button>
         ))}
       </div>
 
-      {/* Tab content */}
       <div className="card">
         <div className="cms-body">
           {tab === 'hero'    && <HeroTab />}
@@ -633,10 +758,7 @@ export default function CMS() {
         </div>
       </div>
 
-      {/* Toast notification */}
-      {toast && (
-        <Toast msg={toast.msg} type={toast.type} onClose={() => setToast(null)} />
-      )}
+      {toast && <Toast msg={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
     </div>
   );
 }

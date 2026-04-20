@@ -549,18 +549,32 @@ export default function Enquiries() {
 
                 <div style={{ display: 'flex', gap: 8 }}>
                   <a
-                    href={`mailto:${sel.email}?subject=Re: Your Property Enquiry — PrimePro`}
-                    className="btn btn-ghost btn-sm"
-                    style={{ flex: 1, justifyContent: 'center' }}
+                  href={`mailto:${sel.email}?subject=${encodeURIComponent('Re: Your Property Enquiry — PrimePro')}&body=${encodeURIComponent(
+      `Hi ${sel.name},\n\nThank you for your enquiry about "${sel.property?.title || 'our property'}".\n\nWe received your message:\n"${sel.message}"\n\nWe will get back to you shortly.\n\nBest regards,\nPrimePro Team`
+    )}`}
+    className="btn btn-ghost btn-sm"
+    style={{ flex: 1, justifyContent: 'center', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 6 }}
+    onClick={() => {
+      if (sel.status === 'new' || sel.status === 'read') {
+        updateStatus(sel._id, 'replied');
+      }
+    }}
                   >
                     ✉️ Reply Email
                   </a>
                   <a
-                    href={`https://wa.me/91${sel.phone}?text=Hi ${encodeURIComponent(sel.name || '')}, thank you for contacting PrimePro. `}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="btn btn-success btn-sm"
-                    style={{ flex: 1, justifyContent: 'center' }}
+                    href={`https://wa.me/${sel.phone?.replace(/\D/g, '')}?text=${encodeURIComponent(
+    `Hi ${sel.name}, thank you for contacting PrimePro regarding "${sel.property?.title || 'your property enquiry'}". How can we help you?`
+  )}`}
+  target="_blank"
+  rel="noopener noreferrer"
+  className="btn btn-success btn-sm"
+  style={{ flex: 1, justifyContent: 'center', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 6 }}
+  onClick={() => {
+    if (sel.status === 'new' || sel.status === 'read') {
+      updateStatus(sel._id, 'replied');
+    }
+  }}
                   >
                     💬 WhatsApp
                   </a>
