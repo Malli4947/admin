@@ -216,6 +216,7 @@ export default function Properties() {
   const [editing,  setEditing]  = useState(null);
   const [form,     setForm]     = useState(EMPTY_FORM);
   const [imgInput, setImgInput] = useState('');
+  console.log('imageinput',imgInput);
 
   // ── Upload state
   const [uploading,       setUploading]       = useState(false);
