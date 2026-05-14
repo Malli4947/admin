@@ -229,7 +229,6 @@ export default function Properties() {
   const [modal,    setModal]    = useState(null);
   const [editing,  setEditing]  = useState(null);
   const [form,     setForm]     = useState(EMPTY_FORM);
-  const [imgInput, setImgInput] = useState('');
 
   // ── Upload state
   const [uploading,       setUploading]       = useState(false);
@@ -332,7 +331,7 @@ export default function Properties() {
     setFPrice({ min:'', max:'' }); setPage(1);
   };
 
-  const openAdd  = () => { setForm(EMPTY_FORM); setEditing(null); setImgInput(''); setModal('form'); };
+  const openAdd  = () => { setForm(EMPTY_FORM); setEditing(null); setModal('form'); };
   const openEdit = (p) => {
     setForm({
       title:               p.title || '',
@@ -369,7 +368,7 @@ export default function Properties() {
       pricePerSft: p.pricePerSft != null ? String(p.pricePerSft) : '',
       totalPrice:  p.totalPrice != null ? String(p.totalPrice) : '',
     });
-    setEditing(p); setImgInput(''); setModal('form');
+    setEditing(p); setModal('form');
   };
   const openView   = (p) => { setEditing(p); setModal('view'); };
   const openDel    = (p) => { setEditing(p); setModal('delete'); };
