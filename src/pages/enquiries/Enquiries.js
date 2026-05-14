@@ -274,8 +274,8 @@ export default function Enquiries() {
 
       {/* ── Filter bar ────────────────────────────────── */}
       <div className="card" style={{ padding: '14px 18px' }}>
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-          <div className="search-bar" style={{ flex: '1 1 200px', minWidth: 180 }}>
+        <div className="enq-filters">
+          <div className="search-bar enq-filters__search">
             <span className="search-bar__icon">🔍</span>
             <input
               placeholder="Search name, email, phone, message…"
@@ -289,14 +289,14 @@ export default function Enquiries() {
             )}
           </div>
 
-          <select className="form-input form-select" style={{ width: 190 }}
+          <select className="form-input form-select enq-filters__sel"
             value={fType} onChange={e => setFType(e.target.value)}>
             {TYPE_OPTIONS.map(t => (
               <option key={t} value={t === 'All' ? '' : t}>{t}</option>
             ))}
           </select>
 
-          <select className="form-input form-select" style={{ width: 150 }}
+          <select className="form-input form-select enq-filters__sel"
             value={fStatus} onChange={e => setFStatus(e.target.value)}>
             <option value="">All Status</option>
             {STATUS_OPTIONS.map(s => (
@@ -304,7 +304,7 @@ export default function Enquiries() {
             ))}
           </select>
 
-          <span className="filter-count" style={{ marginLeft: 'auto' }}>
+          <span className="filter-count enq-filters__count">
             {loading ? '…' : `${total} result${total !== 1 ? 's' : ''}`}
           </span>
         </div>

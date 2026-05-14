@@ -115,20 +115,16 @@ export default function AdminLayout() {
           </div>
 
           <div className="topbar__right">
-            {/* Theme toggle in topbar (desktop convenience) */}
+            {/* Theme toggle in topbar */}
             <button className="topbar__theme" onClick={toggle} title="Toggle theme">
-              {isDark ? '☀️' : '🌙'}
+              <span>{isDark ? '☀️' : '🌙'}</span>
+              <span className="topbar__theme-label">{isDark ? 'Light' : 'Dark'}</span>
             </button>
 
-            {/* Notification bell */}
-            {/* <div className="topbar__notif">
-              🔔
-              <span className="topbar__notif-dot" />
-            </div> */}
-
             {/* Logout */}
-            <button className="topbar__theme" onClick={handleLogout}>
-              <span >🚪</span> <span >Logout</span>
+            <button className="topbar__theme topbar__logout-btn" onClick={handleLogout} title="Logout">
+              <span>🚪</span>
+              <span className="topbar__theme-label">Logout</span>
             </button>
           </div>
         </header>

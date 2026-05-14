@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import api from '../../Utils/api';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import api, { UPLOAD_BASE } from '../../Utils/api';
 import './CMS.css';
 
 // ── Constants ─────────────────────────────────────────────────
@@ -16,6 +16,7 @@ const DEFAULTS = {
     subtitle: 'Discover 1,200+ verified listings. Zero brokerage. RERA compliant.',
     ctaText: 'Browse Properties',
     backgroundImage: '',
+    backgroundImages: [], // multiple images for slideshow
   },
   about: {
     heading: "Hyderabad's Most Trusted Real Estate Platform",
@@ -68,12 +69,7 @@ function Toast({ msg, type = 'success', onClose }) {
   );
 }
 
-// ── ✅ Single Image Upload component ──────────────────────────
-// Props:
-//   value      — current image URL string
-//   onChange   — called with new URL after upload
-//   label      — field label text
-//   inputId    — unique id for the file input (required, must be unique per usage)
+// ── Single Image Upload ───────────────────────────────────────
 function SingleImageUpload({ value, onChange, label = 'Image', inputId }) {
   const [uploading, setUploading] = useState(false);
   const [error,     setError]     = useState('');
@@ -81,130 +77,620 @@ function SingleImageUpload({ value, onChange, label = 'Image', inputId }) {
   const handleFile = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    // Validate size (5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      setError('File too large — max 5 MB');
-      e.target.value = '';
-      return;
-    }
-
-    setError('');
-    setUploading(true);
-
+    if (file.size > 10 * 1024 * 1024) { setError('File too large — max 10 MB'); e.target.value = ''; return; }
+    setError(''); setUploading(true);
     try {
       const formData = new FormData();
-      formData.append('image', file);   // ✅ single field name: "image"
-
-      const res = await fetch('http://localhost:3000/api/upload/image', {
+      formData.append('image', file);
+      const res  = await fetch(`${UPLOAD_BASE}/api/upload/image`, {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('pp_admin_token')}`,
-          // ✅ No Content-Type — browser sets it automatically for FormData
-        },
+        headers: { Authorization: `Bearer ${localStorage.getItem('pp_admin_token')}` },
         body: formData,
       });
-
       const data = await res.json();
-
-      if (data.success) {
-        onChange(data.url);   // ✅ pass new S3 URL up to parent
-      } else {
-        setError(data.message || 'Upload failed');
-      }
-    } catch {
-      setError('Network error — upload failed');
-    }
-
+      if (data.success) { onChange(data.url); }
+      else { setError(data.message || 'Upload failed'); }
+    } catch { setError('Network error — upload failed'); }
     setUploading(false);
-    e.target.value = '';  // reset so same file can be re-selected
+    e.target.value = '';
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+    <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
       <label className="form-label">{label}</label>
-
-      {/* ── Current image preview + change button ── */}
       {value ? (
-        <div style={{ position: 'relative', borderRadius: 10, overflow: 'hidden', border: '1px solid var(--bdr2)' }}>
-          <img
-            src={value}
-            alt="preview"
-            style={{ width: '100%', height: 160, objectFit: 'cover', display: 'block' }}
-          />
-          {/* Overlay with change/remove buttons */}
-          <div style={{
-            position: 'absolute', inset: 0,
-            background: 'rgba(0,0,0,0.45)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
-            opacity: 0, transition: 'opacity 0.2s',
-          }}
+        <div style={{ position:'relative', borderRadius:10, overflow:'hidden', border:'1px solid var(--bdr2)' }}>
+          <img src={value} alt="preview" style={{ width:'100%', height:160, objectFit:'cover', display:'block' }} />
+          <div className="img-overlay"
             onMouseEnter={e => e.currentTarget.style.opacity = 1}
-            onMouseLeave={e => e.currentTarget.style.opacity = 0}
-          >
-            {/* Change image */}
-            <label htmlFor={inputId} style={{
-              background: '#2563EB', color: '#fff', border: 'none',
-              borderRadius: 8, padding: '7px 16px', fontSize: 13,
-              fontWeight: 600, cursor: uploading ? 'not-allowed' : 'pointer',
-              display: 'flex', alignItems: 'center', gap: 5,
-            }}>
+            onMouseLeave={e => e.currentTarget.style.opacity = 0}>
+            <label htmlFor={inputId} className="img-overlay__btn img-overlay__btn--blue">
               {uploading ? '⏳ Uploading…' : '🔄 Change'}
             </label>
-            {/* Remove */}
-            <button
-              onClick={() => onChange('')}
-              style={{
-                background: 'rgba(220,38,38,0.85)', color: '#fff', border: 'none',
-                borderRadius: 8, padding: '7px 14px', fontSize: 13,
-                fontWeight: 600, cursor: 'pointer',
-              }}
-            >✕ Remove</button>
+            <button onClick={() => onChange('')} className="img-overlay__btn img-overlay__btn--red">✕ Remove</button>
           </div>
         </div>
       ) : (
-        /* ── Empty drop zone ── */
-        <label htmlFor={inputId} style={{
-          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-          gap: 8, border: '2px dashed var(--bdr2)', borderRadius: 10,
-          padding: '28px 16px',
-          cursor: uploading ? 'not-allowed' : 'pointer',
-          background: uploading ? 'var(--bg2)' : 'var(--bg3)',
-          opacity: uploading ? 0.7 : 1,
-          transition: 'background 0.2s',
-        }}>
-          <span style={{ fontSize: 30 }}>{uploading ? '⏳' : '📁'}</span>
-          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--t1)' }}>
-            {uploading ? 'Uploading…' : 'Click to upload image'}
+        <label htmlFor={inputId} className={`cms-upload-zone${uploading ? ' cms-upload-zone--busy' : ''}`}>
+          <span style={{ fontSize:28 }}>{uploading ? '⏳' : '📁'}</span>
+          <span style={{ fontSize:13, fontWeight:600, color:'var(--t1)' }}>{uploading ? 'Uploading…' : 'Click to upload'}</span>
+          <span style={{ fontSize:11, color:'var(--t3)' }}>JPEG · PNG · WEBP · Max 10 MB</span>
+        </label>
+      )}
+      <input id={inputId} type="file" accept="image/*" style={{ display:'none' }} disabled={uploading} onChange={handleFile} />
+      {error && <span style={{ fontSize:12, color:'var(--red)' }}>❌ {error}</span>}
+    </div>
+  );
+}
+
+// ── Multi Image Upload (Hero slideshow) ───────────────────────
+function MultiImageUpload({ images = [], onChange, label = 'Images', maxFiles = 10 }) {
+  const [uploading,  setUploading]  = useState(false);
+  const [progress,   setProgress]   = useState([]);
+  const [error,      setError]      = useState('');
+  const inputRef = useRef(null);
+
+  // images = [{ url, publicId, isPrimary }]
+  const handleFiles = async (e) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    if (images.length + files.length > maxFiles) {
+      setError(`Max ${maxFiles} images allowed`); e.target.value = ''; return;
+    }
+    setError(''); setUploading(true);
+    setProgress(files.map(f => ({ name: f.name, status: 'uploading' })));
+    try {
+      const formData = new FormData();
+      files.forEach(f => formData.append('images', f));
+      formData.append('folder', 'cms');
+      const res  = await fetch(`${UPLOAD_BASE}/api/upload/images`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${localStorage.getItem('pp_admin_token')}` },
+        body: formData,
+      });
+      const data = await res.json();
+      if (data.success) {
+        setProgress(files.map(f => ({ name: f.name, status: 'done' })));
+        const newImgs = data.images.map((img, i) => ({
+          url:       img.url,
+          publicId:  img.publicId || null,
+          isPrimary: images.length === 0 && i === 0,
+        }));
+        onChange([...images, ...newImgs]);
+      } else {
+        setProgress(files.map(f => ({ name: f.name, status: 'error' })));
+        setError(data.message || 'Upload failed');
+      }
+    } catch {
+      setProgress(files.map(f => ({ name: f.name, status: 'error' })));
+      setError('Network error — upload failed');
+    }
+    setUploading(false);
+    setTimeout(() => setProgress([]), 2500);
+    e.target.value = '';
+  };
+
+  const remove = (idx) => {
+    const next = images.filter((_, i) => i !== idx);
+    if (next.length > 0 && !next.some(x => x.isPrimary)) next[0] = { ...next[0], isPrimary: true };
+    onChange(next);
+  };
+
+  const setPrimary = (idx) => {
+    onChange(images.map((img, i) => ({ ...img, isPrimary: i === idx })));
+  };
+
+  return (
+    <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+        <label className="form-label">{label} {images.length > 0 && <span style={{ color:'var(--t3)', fontWeight:400 }}>({images.length}/{maxFiles})</span>}</label>
+        {images.length < maxFiles && (
+          <button type="button" className="btn btn-ghost btn-sm" onClick={() => inputRef.current?.click()} disabled={uploading}>
+            {uploading ? <><span className="spinner" style={{ width:12, height:12, borderWidth:2 }} /> Uploading…</> : '+ Add Images'}
+          </button>
+        )}
+      </div>
+
+      {/* Thumbnails grid */}
+      {images.length > 0 && (
+        <div className="cms-img-grid">
+          {images.map((img, i) => (
+            <div key={i} className={`cms-img-thumb${img.isPrimary ? ' cms-img-thumb--primary' : ''}`}>
+              <img src={img.url} alt={`hero-${i+1}`} />
+              {img.isPrimary && <span className="cms-img-thumb__badge">★ Primary</span>}
+              <div className="cms-img-thumb__actions">
+                {!img.isPrimary && (
+                  <button title="Set as primary" onClick={() => setPrimary(i)}>★</button>
+                )}
+                <button title="Remove" onClick={() => remove(i)} style={{ background:'rgba(220,38,38,.85)' }}>✕</button>
+              </div>
+            </div>
+          ))}
+          {/* Add more slot */}
+          {images.length < maxFiles && (
+            <button type="button" className="cms-img-add" onClick={() => inputRef.current?.click()} disabled={uploading}>
+              <span style={{ fontSize:22 }}>+</span>
+              <span style={{ fontSize:11 }}>Add</span>
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Empty drop zone */}
+      {images.length === 0 && (
+        <label className={`cms-upload-zone${uploading ? ' cms-upload-zone--busy' : ''}`}
+          onClick={() => inputRef.current?.click()}>
+          <span style={{ fontSize:32 }}>{uploading ? '⏳' : '�️'}</span>
+          <span style={{ fontSize:13, fontWeight:600, color:'var(--t1)' }}>
+            {uploading ? 'Uploading…' : 'Click to upload hero images'}
           </span>
-          <span style={{ fontSize: 11, color: 'var(--t3)' }}>
-            JPEG, PNG, WEBP · Max 5 MB
+          <span style={{ fontSize:11, color:'var(--t3)' }}>
+            JPEG · PNG · WEBP · Up to {maxFiles} images · Max 10 MB each
           </span>
         </label>
       )}
 
-      {/* Hidden file input */}
-      <input
-        id={inputId}
-        type="file"
-        accept="image/*"
-        style={{ display: 'none' }}
-        disabled={uploading}
-        onChange={handleFile}
-      />
+      {/* Hidden input */}
+      <input ref={inputRef} type="file" accept="image/*" multiple style={{ display:'none' }} disabled={uploading} onChange={handleFiles} />
 
-      {/* Also allow pasting a URL manually */}
-      {/* <input
-        className="form-input"
-        placeholder="…or paste image URL directly"
-        value={value || ''}
-        onChange={e => onChange(e.target.value)}
-        style={{ fontSize: 12 }}
-      /> */}
+      {/* Upload progress */}
+      {progress.length > 0 && (
+        <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+          {progress.map((p, i) => (
+            <div key={i} style={{ display:'flex', alignItems:'center', gap:8, fontSize:12, color:'var(--t2)', background:'var(--bg3)', borderRadius:8, padding:'5px 10px' }}>
+              {p.status === 'uploading' && <span className="spinner" style={{ width:12, height:12, borderWidth:2 }} />}
+              {p.status === 'done'      && <span>✅</span>}
+              {p.status === 'error'     && <span>❌</span>}
+              <span style={{ flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{p.name}</span>
+              <span style={{ color: p.status === 'error' ? 'var(--red)' : 'var(--green)', fontWeight:600 }}>
+                {p.status === 'uploading' ? 'Uploading…' : p.status === 'done' ? 'Done' : 'Failed'}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
 
-      {/* Error */}
-      {error && (
-        <span style={{ fontSize: 12, color: 'var(--red)' }}>❌ {error}</span>
+      {error && <span style={{ fontSize:12, color:'var(--red)' }}>❌ {error}</span>}
+      {images.length > 0 && (
+        <p style={{ fontSize:11, color:'var(--t3)', margin:0 }}>
+          Click ★ on any image to set it as the primary (first shown). Drag to reorder is not supported — remove and re-add to change order.
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ── Hero Tab ──────────────────────────────────────────────────
+function HeroTab({ cmsHero, saveSection, showToast }) {
+  const [form,    setForm]    = useState({
+    ...cmsHero,
+    backgroundImages: Array.isArray(cmsHero.backgroundImages) ? cmsHero.backgroundImages : [],
+  });
+  const [saving,  setSaving]  = useState(false);
+  const [changed, setChanged] = useState(false);
+  const [preview, setPreview] = useState(0);
+
+  const handleChange = (key, val) => { setForm(f => ({ ...f, [key]: val })); setChanged(true); };
+
+  const handleImagesChange = (imgs) => {
+    setForm(f => ({ ...f, backgroundImages: imgs }));
+    setChanged(true);
+    setPreview(p => Math.min(p, Math.max(0, imgs.length - 1)));
+  };
+
+  const handleSave = async () => {
+    if (!form.title?.trim()) return showToast('Heading is required', 'error');
+    setSaving(true);
+    const primaryImg = form.backgroundImages.find(x => x.isPrimary) || form.backgroundImages[0];
+    const payload = {
+      ...form,
+      backgroundImage:  primaryImg?.url || '',
+      backgroundImages: form.backgroundImages,
+    };
+    await saveSection('hero', payload, 'Hero Section');
+    setSaving(false);
+    setChanged(false);
+  };
+
+  const previewUrl = form.backgroundImages[preview]?.url || '';
+
+  return (
+    <div>
+      <div className="cms-sec-header">
+        <div>
+          <div className="cms-sec-title">Hero Section</div>
+          <div className="cms-sec-sub">Manage the homepage banner — add multiple background images for a slideshow.</div>
+        </div>
+        {changed && <span className="badge badge-amber">Unsaved changes</span>}
+      </div>
+
+      <div className="cms-preview-wrap">
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
+          <div className="cms-preview-lbl" style={{ margin:0 }}>Live Preview</div>
+          {form.backgroundImages.length > 1 && (
+            <div style={{ display:'flex', gap:5 }}>
+              {form.backgroundImages.map((_, i) => (
+                <button key={i} onClick={() => setPreview(i)}
+                  style={{ width:8, height:8, borderRadius:'50%', border:'none', cursor:'pointer', padding:0,
+                    background: i === preview ? 'var(--gold)' : 'var(--bdr2)', transition:'background 0.2s' }} />
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="cms-hero-preview">
+          {previewUrl && <img src={previewUrl} alt="bg" className="cms-hero-bg" />}
+          <div className="cms-hero-overlay" />
+          <div className="cms-hero-content">
+            <h3>{form.title || 'Your Headline Here'}</h3>
+            <p>{form.subtitle || 'Subtitle / tagline text'}</p>
+            <div className="cms-hero-cta">{form.ctaText || 'Get Started'}</div>
+          </div>
+          {form.backgroundImages.length > 1 && (
+            <div style={{ position:'absolute', bottom:10, left:'50%', transform:'translateX(-50%)', display:'flex', gap:5 }}>
+              {form.backgroundImages.map((_, i) => (
+                <span key={i} style={{ width:6, height:6, borderRadius:'50%', display:'inline-block',
+                  background: i === preview ? '#fff' : 'rgba(255,255,255,.4)' }} />
+              ))}
+            </div>
+          )}
+        </div>
+        {form.backgroundImages.length > 1 && (
+          <p style={{ fontSize:11, color:'var(--t3)', marginTop:6, textAlign:'center' }}>
+            Click the dots above to preview each image · {form.backgroundImages.length} images total
+          </p>
+        )}
+      </div>
+
+      <div className="cms-form-grid">
+        <div className="form-group cms-form-full">
+          <label className="form-label">Main Heading *</label>
+          <input className="form-input" placeholder="Find Your Dream Property in Hyderabad"
+            value={form.title || ''} onChange={e => handleChange('title', e.target.value)} />
+        </div>
+        <div className="form-group cms-form-full">
+          <label className="form-label">Subtitle / Tagline</label>
+          <textarea className="form-input form-textarea" rows={3} placeholder="Discover 1,200+ verified listings…"
+            value={form.subtitle || ''} onChange={e => handleChange('subtitle', e.target.value)} />
+        </div>
+        <div className="form-group">
+          <label className="form-label">CTA Button Text</label>
+          <input className="form-input" placeholder="Browse Properties"
+            value={form.ctaText || ''} onChange={e => handleChange('ctaText', e.target.value)} />
+        </div>
+        <div className="form-group">
+          <label className="form-label">Slideshow Interval (seconds)</label>
+          <input type="number" min={2} max={30} className="form-input" placeholder="5"
+            value={form.slideshowInterval || ''}
+            onChange={e => handleChange('slideshowInterval', parseInt(e.target.value) || 5)} />
+        </div>
+      </div>
+
+      <div style={{ marginBottom:20 }}>
+        <MultiImageUpload
+          label="Background Images (Slideshow)"
+          images={form.backgroundImages}
+          onChange={handleImagesChange}
+          maxFiles={10}
+        />
+      </div>
+
+      <div className="cms-actions">
+        <button className="btn btn-ghost"
+          onClick={() => {
+            setForm({ ...cmsHero, backgroundImages: Array.isArray(cmsHero.backgroundImages) ? cmsHero.backgroundImages : [] });
+            setChanged(false);
+          }}
+          disabled={!changed}>Reset</button>
+        <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
+          {saving ? <><span className="spinner" /> Saving…</> : '💾 Save Hero'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── About Tab ─────────────────────────────────────────────────
+function AboutTab({ cmsAbout, saveSection, showToast }) {
+  const [form,    setForm]    = useState({ ...cmsAbout });
+  const [saving,  setSaving]  = useState(false);
+  const [changed, setChanged] = useState(false);
+
+  const handleChange = (key, val) => { setForm(f => ({ ...f, [key]: val })); setChanged(true); };
+
+  const handleSave = async () => {
+    setSaving(true);
+    await saveSection('about', form, 'About Section');
+    setSaving(false);
+    setChanged(false);
+  };
+
+  return (
+    <div>
+      <div className="cms-sec-header">
+        <div>
+          <div className="cms-sec-title">About Section</div>
+          <div className="cms-sec-sub">Update company info, contact details and stats.</div>
+        </div>
+        {changed && <span className="badge badge-amber">Unsaved changes</span>}
+      </div>
+
+      <div className="cms-form-grid">
+        <div className="form-group cms-form-full">
+          <label className="form-label">Section Heading</label>
+          <input className="form-input" placeholder="Hyderabad's Most Trusted Real Estate Platform"
+            value={form.heading || ''} onChange={e => handleChange('heading', e.target.value)} />
+        </div>
+        <div className="form-group cms-form-full">
+          <label className="form-label">Body Text</label>
+          <textarea className="form-input form-textarea" rows={5} placeholder="Company description…"
+            value={form.body || ''} onChange={e => handleChange('body', e.target.value)} />
+        </div>
+        <div className="form-group">
+          <label className="form-label">Years of Experience</label>
+          <input type="number" min={0} className="form-input"
+            value={form.yearsExperience ?? ''}
+            onChange={e => handleChange('yearsExperience', parseInt(e.target.value) || 0)} />
+        </div>
+        <div className="form-group">
+          <label className="form-label">Contact Email</label>
+          <input type="email" className="form-input" placeholder="info@primepro.in"
+            value={form.email || ''} onChange={e => handleChange('email', e.target.value)} />
+        </div>
+        <div className="form-group">
+          <label className="form-label">Phone / Toll-Free</label>
+          <input className="form-input" placeholder="1800 500 600"
+            value={form.phone || ''} onChange={e => handleChange('phone', e.target.value)} />
+        </div>
+        <div className="form-group">
+          <label className="form-label">Address</label>
+          <input className="form-input" placeholder="PrimePro HQ, Banjara Hills, Hyderabad"
+            value={form.address || ''} onChange={e => handleChange('address', e.target.value)} />
+        </div>
+        <div className="form-group cms-form-full">
+          <SingleImageUpload inputId="about-img-upload" label="About Section Image"
+            value={form.image || ''} onChange={val => handleChange('image', val)} />
+        </div>
+      </div>
+
+      <div className="cms-actions">
+        <button className="btn btn-ghost"
+          onClick={() => { setForm({ ...cmsAbout }); setChanged(false); }}
+          disabled={!changed}>Reset</button>
+        <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
+          {saving ? <><span className="spinner" /> Saving…</> : '💾 Save About'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── SEO Tab ───────────────────────────────────────────────────
+function SeoTab({ cmsSeo, saveSection }) {
+  const [form,    setForm]    = useState({ ...cmsSeo });
+  const [saving,  setSaving]  = useState(false);
+  const [changed, setChanged] = useState(false);
+  const [cc,      setCC]      = useState({
+    t: (cmsSeo.metaTitle || '').length,
+    d: (cmsSeo.metaDescription || '').length,
+  });
+
+  const handleChange = (key, val) => {
+    setForm(f => ({ ...f, [key]: val }));
+    setChanged(true);
+    if (key === 'metaTitle')       setCC(c => ({ ...c, t: val.length }));
+    if (key === 'metaDescription') setCC(c => ({ ...c, d: val.length }));
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    await saveSection('seo', form, 'SEO Settings');
+    setSaving(false);
+    setChanged(false);
+  };
+
+  return (
+    <div>
+      <div className="cms-sec-header">
+        <div>
+          <div className="cms-sec-title">SEO &amp; Meta Tags</div>
+          <div className="cms-sec-sub">Control how PrimePro appears in Google search results.</div>
+        </div>
+        {changed && <span className="badge badge-amber">Unsaved changes</span>}
+      </div>
+
+      <div className="seo-preview">
+        <div className="seo-preview__lbl">Google Search Preview</div>
+        <div className="seo-preview__url">https://primepro.in/</div>
+        <div className="seo-preview__title">{form.metaTitle || 'Page Title Here'}</div>
+        <div className="seo-preview__desc">{form.metaDescription || 'Meta description appears here…'}</div>
+      </div>
+
+      <div className="cms-form-grid">
+        <div className="form-group cms-form-full">
+          <div style={{ display:'flex', justifyContent:'space-between', marginBottom:5 }}>
+            <label className="form-label">Meta Title</label>
+            <span className={`cms-char-cnt${cc.t > 60 ? ' over' : ''}`}>{cc.t}/60</span>
+          </div>
+          <input className="form-input" placeholder="PrimePro — Premium Real Estate in Hyderabad"
+            value={form.metaTitle || ''} onChange={e => handleChange('metaTitle', e.target.value)} />
+          {cc.t > 60 && <span className="form-error">Title is too long — Google may truncate it</span>}
+        </div>
+        <div className="form-group cms-form-full">
+          <div style={{ display:'flex', justifyContent:'space-between', marginBottom:5 }}>
+            <label className="form-label">Meta Description</label>
+            <span className={`cms-char-cnt${cc.d > 160 ? ' over' : ''}`}>{cc.d}/160</span>
+          </div>
+          <textarea className="form-input form-textarea" rows={3}
+            placeholder="Find verified residential, commercial and agricultural properties…"
+            value={form.metaDescription || ''} onChange={e => handleChange('metaDescription', e.target.value)} />
+          {cc.d > 160 && <span className="form-error">Description is too long — Google may truncate it</span>}
+        </div>
+        <div className="form-group cms-form-full">
+          <label className="form-label">Keywords (comma separated)</label>
+          <input className="form-input" placeholder="real estate hyderabad, buy flat, villa for sale"
+            value={form.keywords || ''} onChange={e => handleChange('keywords', e.target.value)} />
+        </div>
+        <div className="form-group">
+          <SingleImageUpload inputId="seo-og-upload" label="OG Image (social share)"
+            value={form.ogImage || ''} onChange={val => handleChange('ogImage', val)} />
+        </div>
+        <div className="form-group">
+          <label className="form-label">Canonical URL</label>
+          <input className="form-input" placeholder="https://primepro.in"
+            value={form.canonical || ''} onChange={e => handleChange('canonical', e.target.value)} />
+        </div>
+      </div>
+
+      <div className="cms-actions">
+        <button className="btn btn-ghost"
+          onClick={() => {
+            setForm({ ...cmsSeo }); setChanged(false);
+            setCC({ t: (cmsSeo.metaTitle||'').length, d: (cmsSeo.metaDescription||'').length });
+          }}
+          disabled={!changed}>Reset</button>
+        <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
+          {saving ? <><span className="spinner" /> Saving…</> : '💾 Save SEO'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Banners Tab ───────────────────────────────────────────────
+function BannersTab({ cmsBanners, saveSection, showToast }) {
+  const [banners,     setBanners]     = useState(Array.isArray(cmsBanners) ? [...cmsBanners] : []);
+  const [saving,      setSaving]      = useState(false);
+  const [bannerModal, setBannerModal] = useState(false);
+  const [editBanner,  setEditBanner]  = useState(null);
+  const [bForm,       setBForm]       = useState({ title:'', subtitle:'', image:'', isActive:true });
+
+  const persistBanners = async (updatedBanners) => {
+    setSaving(true);
+    const ok = await saveSection('banners', updatedBanners, 'Banners');
+    if (ok) setBanners(updatedBanners);
+    setSaving(false);
+    return ok;
+  };
+
+  const toggleBannerActive = (id) => {
+    const updated = banners.map(b => b._id === id ? { ...b, isActive: !b.isActive } : b);
+    persistBanners(updated);
+  };
+
+  const deleteBanner = (id) => {
+    const updated = banners.filter(b => b._id !== id);
+    persistBanners(updated);
+  };
+
+  const handleBannerSave = async () => {
+    if (!bForm.title?.trim()) return showToast('Banner title is required', 'error');
+    setSaving(true);
+    let updated;
+    if (editBanner) {
+      updated = banners.map(b => b._id === editBanner._id ? { ...b, ...bForm } : b);
+    } else {
+      updated = [...banners, { ...bForm, _id: `b${Date.now()}` }];
+    }
+    const ok = await saveSection('banners', updated, 'Banners');
+    if (ok) {
+      setBanners(updated);
+      setBannerModal(false);
+      setEditBanner(null);
+    }
+    setSaving(false);
+  };
+
+  return (
+    <div>
+      <div className="cms-sec-header">
+        <div>
+          <div className="cms-sec-title">Promotional Banners</div>
+          <div className="cms-sec-sub">
+            {banners.length} banner{banners.length !== 1 ? 's' : ''} — {banners.filter(b => b.isActive).length} active
+          </div>
+        </div>
+        <button className="btn btn-primary" onClick={() => {
+          setEditBanner(null);
+          setBForm({ title:'', subtitle:'', image:'', isActive:true });
+          setBannerModal(true);
+        }}>+ Add Banner</button>
+      </div>
+
+      <div className="cms-banners-grid">
+        {banners.map(b => (
+          <div key={b._id} className="banner-card">
+            <div className="banner-card__img">
+              {b.image
+                ? <img src={b.image} alt={b.title} />
+                : <div className="banner-card__placeholder">🎨</div>
+              }
+              <span className={`badge ${b.isActive ? 'badge-green' : 'badge-red'} banner-card__badge`}>
+                {b.isActive ? 'Active' : 'Off'}
+              </span>
+            </div>
+            <div className="banner-card__body">
+              <div className="banner-card__title">{b.title}</div>
+              <div className="banner-card__sub">{b.subtitle}</div>
+              <div className="banner-card__actions">
+                <button className="btn btn-ghost btn-sm" style={{ flex:1 }}
+                  onClick={() => toggleBannerActive(b._id)} disabled={saving}>
+                  {b.isActive ? '⏸ Deactivate' : '▶ Activate'}
+                </button>
+                <button className="act-btn act-btn--edit" onClick={() => {
+                  setEditBanner(b);
+                  setBForm({ title:b.title, subtitle:b.subtitle, image:b.image, isActive:b.isActive });
+                  setBannerModal(true);
+                }}>✏️</button>
+                <button className="act-btn act-btn--del"
+                  onClick={() => deleteBanner(b._id)} disabled={saving}>🗑</button>
+              </div>
+            </div>
+          </div>
+        ))}
+        <button className="banner-add" onClick={() => {
+          setEditBanner(null);
+          setBForm({ title:'', subtitle:'', image:'', isActive:true });
+          setBannerModal(true);
+        }}>
+          <span style={{ fontSize:32 }}>+</span>
+          <span>Add New Banner</span>
+        </button>
+      </div>
+
+      {bannerModal && (
+        <Modal
+          title={editBanner ? '✏️ Edit Banner' : '🎨 Add Banner'}
+          onClose={() => { setBannerModal(false); setEditBanner(null); }}>
+          <div className="modal__body" style={{ display:'flex', flexDirection:'column', gap:14 }}>
+            <div className="form-group">
+              <label className="form-label">Title *</label>
+              <input className="form-input" placeholder="e.g. Summer Offer"
+                value={bForm.title}
+                onChange={e => setBForm(f => ({ ...f, title:e.target.value }))} />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Subtitle / CTA Text</label>
+              <input className="form-input" placeholder="Short promotional text"
+                value={bForm.subtitle}
+                onChange={e => setBForm(f => ({ ...f, subtitle:e.target.value }))} />
+            </div>
+            <SingleImageUpload inputId="banner-img-upload" label="Banner Image"
+              value={bForm.image || ''}
+              onChange={val => setBForm(f => ({ ...f, image:val }))} />
+            <label className="check-label">
+              <input type="checkbox" checked={bForm.isActive}
+                onChange={e => setBForm(f => ({ ...f, isActive:e.target.checked }))} />
+              Active Banner (shown on website)
+            </label>
+          </div>
+          <div className="modal__footer">
+            <button className="btn btn-ghost"
+              onClick={() => { setBannerModal(false); setEditBanner(null); }}>Cancel</button>
+            <button className="btn btn-primary" onClick={handleBannerSave} disabled={saving}>
+              {saving ? <><span className="spinner" /> Saving…</> : editBanner ? '💾 Save Changes' : '+ Add Banner'}
+            </button>
+          </div>
+        </Modal>
       )}
     </div>
   );
@@ -217,10 +703,6 @@ export default function CMS() {
   const [loading, setLoading] = useState(true);
   const [toast,   setToast]   = useState(null);
 
-  const [bannerModal, setBannerModal] = useState(false);
-  const [editBanner,  setEditBanner]  = useState(null);
-  const [bForm,       setBForm]       = useState({ title: '', subtitle: '', image: '', isActive: true });
-
   const showToast = (msg, type = 'success') => setToast({ msg, type });
 
   const loadCMS = useCallback(async () => {
@@ -228,8 +710,16 @@ export default function CMS() {
     try {
       const data = await api.get('/api/cms');
       if (data.success) {
+        const heroRaw = data.cms?.hero || {};
+        // Normalise backgroundImages — support both old single string and new array
+        let bgImages = [];
+        if (Array.isArray(heroRaw.backgroundImages) && heroRaw.backgroundImages.length > 0) {
+          bgImages = heroRaw.backgroundImages;
+        } else if (heroRaw.backgroundImage) {
+          bgImages = [{ url: heroRaw.backgroundImage, publicId: null, isPrimary: true }];
+        }
         const merged = {
-          hero:    { ...DEFAULTS.hero,    ...(data.cms?.hero    || {}) },
+          hero:    { ...DEFAULTS.hero, ...heroRaw, backgroundImages: bgImages },
           about:   { ...DEFAULTS.about,   ...(data.cms?.about   || {}) },
           seo:     { ...DEFAULTS.seo,     ...(data.cms?.seo     || {}) },
           banners: Array.isArray(data.cms?.banners) ? data.cms.banners : DEFAULTS.banners,
@@ -281,452 +771,6 @@ export default function CMS() {
     );
   }
 
-  // ─────────────────────────────────────────────────────────
-  // HERO TAB
-  // ─────────────────────────────────────────────────────────
-  function HeroTab() {
-    const [form,    setForm]    = useState({ ...cms.hero });
-    const [saving,  setSaving]  = useState(false);
-    const [changed, setChanged] = useState(false);
-
-    const handleChange = (key, val) => {
-      setForm(f => ({ ...f, [key]: val }));
-      setChanged(true);
-    };
-
-    const handleSave = async () => {
-      if (!form.title?.trim()) return showToast('Heading is required', 'error');
-      setSaving(true);
-      await saveSection('hero', form, 'Hero Section');
-      setSaving(false);
-      setChanged(false);
-    };
-
-    return (
-      <div>
-        <div className="cms-sec-header">
-          <div>
-            <div className="cms-sec-title">Hero Section</div>
-            <div className="cms-sec-sub">Manage the main homepage banner and call-to-action.</div>
-          </div>
-          {changed && <span className="badge badge-amber">Unsaved changes</span>}
-        </div>
-
-        {/* Live preview */}
-        <div className="cms-preview-wrap">
-          <div className="cms-preview-lbl">Live Preview</div>
-          <div className="cms-hero-preview">
-            {form.backgroundImage && (
-              <img src={form.backgroundImage} alt="bg" className="cms-hero-bg" />
-            )}
-            <div className="cms-hero-overlay" />
-            <div className="cms-hero-content">
-              <h3>{form.title || 'Your Headline Here'}</h3>
-              <p>{form.subtitle || 'Subtitle / tagline text'}</p>
-              <div className="cms-hero-cta">{form.ctaText || 'Get Started'}</div>
-            </div>
-          </div>
-        </div>
-
-        <div className="cms-form-grid">
-          <div className="form-group cms-form-full">
-            <label className="form-label">Main Heading *</label>
-            <input className="form-input"
-              placeholder="Find Your Dream Property in Hyderabad"
-              value={form.title || ''}
-              onChange={e => handleChange('title', e.target.value)} />
-          </div>
-          <div className="form-group cms-form-full">
-            <label className="form-label">Subtitle / Tagline</label>
-            <textarea className="form-input form-textarea" rows={3}
-              placeholder="Discover 1,200+ verified listings…"
-              value={form.subtitle || ''}
-              onChange={e => handleChange('subtitle', e.target.value)} />
-          </div>
-          <div className="form-group">
-            <label className="form-label">CTA Button Text</label>
-            <input className="form-input" placeholder="Browse Properties"
-              value={form.ctaText || ''}
-              onChange={e => handleChange('ctaText', e.target.value)} />
-          </div>
-
-          {/* ✅ Background image — upload or paste URL */}
-          <div className="form-group">
-            <SingleImageUpload
-              inputId="hero-bg-upload"
-              label="Background Image"
-              value={form.backgroundImage || ''}
-              onChange={val => handleChange('backgroundImage', val)}
-            />
-          </div>
-        </div>
-
-        <div className="cms-actions">
-          <button className="btn btn-ghost"
-            onClick={() => { setForm({ ...cms.hero }); setChanged(false); }}
-            disabled={!changed}>Reset</button>
-          <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
-            {saving ? <><span className="spinner" /> Saving…</> : '💾 Save Hero'}
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // ─────────────────────────────────────────────────────────
-  // ABOUT TAB
-  // ─────────────────────────────────────────────────────────
-  function AboutTab() {
-    const [form,    setForm]    = useState({ ...cms.about });
-    const [saving,  setSaving]  = useState(false);
-    const [changed, setChanged] = useState(false);
-
-    const handleChange = (key, val) => {
-      setForm(f => ({ ...f, [key]: val }));
-      setChanged(true);
-    };
-
-    const handleSave = async () => {
-      setSaving(true);
-      await saveSection('about', form, 'About Section');
-      setSaving(false);
-      setChanged(false);
-    };
-
-    return (
-      <div>
-        <div className="cms-sec-header">
-          <div>
-            <div className="cms-sec-title">About Section</div>
-            <div className="cms-sec-sub">Update company info, contact details and stats.</div>
-          </div>
-          {changed && <span className="badge badge-amber">Unsaved changes</span>}
-        </div>
-
-        <div className="cms-form-grid">
-          <div className="form-group cms-form-full">
-            <label className="form-label">Section Heading</label>
-            <input className="form-input"
-              placeholder="Hyderabad's Most Trusted Real Estate Platform"
-              value={form.heading || ''}
-              onChange={e => handleChange('heading', e.target.value)} />
-          </div>
-          <div className="form-group cms-form-full">
-            <label className="form-label">Body Text</label>
-            <textarea className="form-input form-textarea" rows={5}
-              placeholder="Company description…"
-              value={form.body || ''}
-              onChange={e => handleChange('body', e.target.value)} />
-          </div>
-          <div className="form-group">
-            <label className="form-label">Years of Experience</label>
-            <input type="number" min={0} className="form-input"
-              value={form.yearsExperience ?? ''}
-              onChange={e => handleChange('yearsExperience', parseInt(e.target.value) || 0)} />
-          </div>
-          <div className="form-group">
-            <label className="form-label">Contact Email</label>
-            <input type="email" className="form-input"
-              placeholder="info@primepro.in"
-              value={form.email || ''}
-              onChange={e => handleChange('email', e.target.value)} />
-          </div>
-          <div className="form-group">
-            <label className="form-label">Phone / Toll-Free</label>
-            <input className="form-input"
-              placeholder="1800 500 600"
-              value={form.phone || ''}
-              onChange={e => handleChange('phone', e.target.value)} />
-          </div>
-          <div className="form-group">
-            <label className="form-label">Address</label>
-            <input className="form-input"
-              placeholder="PrimePro HQ, Banjara Hills, Hyderabad"
-              value={form.address || ''}
-              onChange={e => handleChange('address', e.target.value)} />
-          </div>
-
-          <div className="form-group cms-form-full">
-            <SingleImageUpload
-              inputId="about-img-upload"
-              label="About Section Image"
-              value={form.image || ''}
-              onChange={val => handleChange('image', val)}
-            />
-          </div>
-        </div>
-
-        <div className="cms-actions">
-          <button className="btn btn-ghost"
-            onClick={() => { setForm({ ...cms.about }); setChanged(false); }}
-            disabled={!changed}>Reset</button>
-          <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
-            {saving ? <><span className="spinner" /> Saving…</> : '💾 Save About'}
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // ─────────────────────────────────────────────────────────
-  // SEO TAB
-  // ─────────────────────────────────────────────────────────
-  function SeoTab() {
-    const [form,    setForm]    = useState({ ...cms.seo });
-    const [saving,  setSaving]  = useState(false);
-    const [changed, setChanged] = useState(false);
-    const [cc,      setCC]      = useState({
-      t: (form.metaTitle || '').length,
-      d: (form.metaDescription || '').length,
-    });
-
-    const handleChange = (key, val) => {
-      setForm(f => ({ ...f, [key]: val }));
-      setChanged(true);
-      if (key === 'metaTitle')       setCC(c => ({ ...c, t: val.length }));
-      if (key === 'metaDescription') setCC(c => ({ ...c, d: val.length }));
-    };
-
-    const handleSave = async () => {
-      setSaving(true);
-      await saveSection('seo', form, 'SEO Settings');
-      setSaving(false);
-      setChanged(false);
-    };
-
-    return (
-      <div>
-        <div className="cms-sec-header">
-          <div>
-            <div className="cms-sec-title">SEO &amp; Meta Tags</div>
-            <div className="cms-sec-sub">Control how PrimePro appears in Google search results.</div>
-          </div>
-          {changed && <span className="badge badge-amber">Unsaved changes</span>}
-        </div>
-
-        <div className="seo-preview">
-          <div className="seo-preview__lbl">Google Search Preview</div>
-          <div className="seo-preview__url">https://primepro.in/</div>
-          <div className="seo-preview__title">{form.metaTitle || 'Page Title Here'}</div>
-          <div className="seo-preview__desc">{form.metaDescription || 'Meta description appears here…'}</div>
-        </div>
-
-        <div className="cms-form-grid">
-          <div className="form-group cms-form-full">
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
-              <label className="form-label">Meta Title</label>
-              <span className={`cms-char-cnt${cc.t > 60 ? ' over' : ''}`}>{cc.t}/60</span>
-            </div>
-            <input className="form-input"
-              placeholder="PrimePro — Premium Real Estate in Hyderabad"
-              value={form.metaTitle || ''}
-              onChange={e => handleChange('metaTitle', e.target.value)} />
-            {cc.t > 60 && <span className="form-error">Title is too long — Google may truncate it</span>}
-          </div>
-          <div className="form-group cms-form-full">
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
-              <label className="form-label">Meta Description</label>
-              <span className={`cms-char-cnt${cc.d > 160 ? ' over' : ''}`}>{cc.d}/160</span>
-            </div>
-            <textarea className="form-input form-textarea" rows={3}
-              placeholder="Find verified residential, commercial and agricultural properties…"
-              value={form.metaDescription || ''}
-              onChange={e => handleChange('metaDescription', e.target.value)} />
-            {cc.d > 160 && <span className="form-error">Description is too long — Google may truncate it</span>}
-          </div>
-          <div className="form-group cms-form-full">
-            <label className="form-label">Keywords (comma separated)</label>
-            <input className="form-input"
-              placeholder="real estate hyderabad, buy flat, villa for sale"
-              value={form.keywords || ''}
-              onChange={e => handleChange('keywords', e.target.value)} />
-          </div>
-          <div className="form-group">
-            {/* ✅ OG Image — upload or paste */}
-            <SingleImageUpload
-              inputId="seo-og-upload"
-              label="OG Image (social share)"
-              value={form.ogImage || ''}
-              onChange={val => handleChange('ogImage', val)}
-            />
-          </div>
-          <div className="form-group">
-            <label className="form-label">Canonical URL</label>
-            <input className="form-input"
-              placeholder="https://primepro.in"
-              value={form.canonical || ''}
-              onChange={e => handleChange('canonical', e.target.value)} />
-          </div>
-        </div>
-
-        <div className="cms-actions">
-          <button className="btn btn-ghost"
-            onClick={() => {
-              setForm({ ...cms.seo }); setChanged(false);
-              setCC({ t: (cms.seo.metaTitle||'').length, d: (cms.seo.metaDescription||'').length });
-            }}
-            disabled={!changed}>Reset</button>
-          <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
-            {saving ? <><span className="spinner" /> Saving…</> : '💾 Save SEO'}
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // ─────────────────────────────────────────────────────────
-  // BANNERS TAB
-  // ─────────────────────────────────────────────────────────
-  function BannersTab() {
-    const [banners, setBanners] = useState(Array.isArray(cms.banners) ? [...cms.banners] : []);
-    const [saving,  setSaving]  = useState(false);
-
-    const persistBanners = async (updatedBanners) => {
-      setSaving(true);
-      const ok = await saveSection('banners', updatedBanners, 'Banners');
-      if (ok) {
-        setBanners(updatedBanners);
-        setCms(prev => ({ ...prev, banners: updatedBanners }));
-      }
-      setSaving(false);
-      return ok;
-    };
-
-    const toggleBannerActive = async (id) => {
-      const updated = banners.map(b => b._id === id ? { ...b, isActive: !b.isActive } : b);
-      await persistBanners(updated);
-    };
-
-    const deleteBanner = async (id) => {
-      const updated = banners.filter(b => b._id !== id);
-      await persistBanners(updated);
-    };
-
-    const handleBannerSave = async () => {
-      if (!bForm.title?.trim()) return showToast('Banner title is required', 'error');
-      setSaving(true);
-      let updated;
-      if (editBanner) {
-        updated = banners.map(b => b._id === editBanner._id ? { ...b, ...bForm } : b);
-      } else {
-        updated = [...banners, { ...bForm, _id: `b${Date.now()}` }];
-      }
-      const ok = await saveSection('banners', updated, 'Banners');
-      if (ok) {
-        setBanners(updated);
-        setCms(prev => ({ ...prev, banners: updated }));
-        setBannerModal(false);
-        setEditBanner(null);
-      }
-      setSaving(false);
-    };
-
-    return (
-      <div>
-        <div className="cms-sec-header">
-          <div>
-            <div className="cms-sec-title">Promotional Banners</div>
-            <div className="cms-sec-sub">
-              {banners.length} banner{banners.length !== 1 ? 's' : ''} —
-              {banners.filter(b => b.isActive).length} active
-            </div>
-          </div>
-          <button className="btn btn-primary" onClick={() => {
-            setEditBanner(null);
-            setBForm({ title: '', subtitle: '', image: '', isActive: true });
-            setBannerModal(true);
-          }}>+ Add Banner</button>
-        </div>
-
-        <div className="cms-banners-grid">
-          {banners.map(b => (
-            <div key={b._id} className="banner-card">
-              <div className="banner-card__img">
-                {b.image
-                  ? <img src={b.image} alt={b.title} />
-                  : <div className="banner-card__placeholder">🎨</div>
-                }
-                <span className={`badge ${b.isActive ? 'badge-green' : 'badge-red'} banner-card__badge`}>
-                  {b.isActive ? 'Active' : 'Off'}
-                </span>
-              </div>
-              <div className="banner-card__body">
-                <div className="banner-card__title">{b.title}</div>
-                <div className="banner-card__sub">{b.subtitle}</div>
-                <div className="banner-card__actions">
-                  <button className="btn btn-ghost btn-sm" style={{ flex: 1 }}
-                    onClick={() => toggleBannerActive(b._id)} disabled={saving}>
-                    {b.isActive ? '⏸ Deactivate' : '▶ Activate'}
-                  </button>
-                  <button className="act-btn act-btn--edit" onClick={() => {
-                    setEditBanner(b);
-                    setBForm({ title: b.title, subtitle: b.subtitle, image: b.image, isActive: b.isActive });
-                    setBannerModal(true);
-                  }}>✏️</button>
-                  <button className="act-btn act-btn--del"
-                    onClick={() => deleteBanner(b._id)} disabled={saving}>🗑</button>
-                </div>
-              </div>
-            </div>
-          ))}
-
-          <button className="banner-add" onClick={() => {
-            setEditBanner(null);
-            setBForm({ title: '', subtitle: '', image: '', isActive: true });
-            setBannerModal(true);
-          }}>
-            <span style={{ fontSize: 32 }}>+</span>
-            <span>Add New Banner</span>
-          </button>
-        </div>
-
-        {/* Banner form modal */}
-        {bannerModal && (
-          <Modal
-            title={editBanner ? '✏️ Edit Banner' : '🎨 Add Banner'}
-            onClose={() => { setBannerModal(false); setEditBanner(null); }}
-          >
-            <div className="modal__body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              <div className="form-group">
-                <label className="form-label">Title *</label>
-                <input className="form-input" placeholder="e.g. Summer Offer"
-                  value={bForm.title}
-                  onChange={e => setBForm(f => ({ ...f, title: e.target.value }))} />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Subtitle / CTA Text</label>
-                <input className="form-input" placeholder="Short promotional text"
-                  value={bForm.subtitle}
-                  onChange={e => setBForm(f => ({ ...f, subtitle: e.target.value }))} />
-              </div>
-
-              <SingleImageUpload
-                inputId="banner-img-upload"
-                label="Banner Image"
-                value={bForm.image || ''}
-                onChange={val => setBForm(f => ({ ...f, image: val }))}
-              />
-
-              <label className="check-label">
-                <input type="checkbox" checked={bForm.isActive}
-                  onChange={e => setBForm(f => ({ ...f, isActive: e.target.checked }))} />
-                Active Banner (shown on website)
-              </label>
-            </div>
-            <div className="modal__footer">
-              <button className="btn btn-ghost"
-                onClick={() => { setBannerModal(false); setEditBanner(null); }}>Cancel
-              </button>
-              <button className="btn btn-primary" onClick={handleBannerSave} disabled={saving}>
-                {saving ? <><span className="spinner" /> Saving…</> : editBanner ? '💾 Save Changes' : '+ Add Banner'}
-              </button>
-            </div>
-          </Modal>
-        )}
-      </div>
-    );
-  }
-
   // ── Render ────────────────────────────────────────────────
   return (
     <div className="page a-up">
@@ -751,10 +795,10 @@ export default function CMS() {
 
       <div className="card">
         <div className="cms-body">
-          {tab === 'hero'    && <HeroTab />}
-          {tab === 'about'   && <AboutTab />}
-          {tab === 'seo'     && <SeoTab />}
-          {tab === 'banners' && <BannersTab />}
+          {tab === 'hero'    && <HeroTab    cmsHero={cms.hero}       saveSection={saveSection} showToast={showToast} />}
+          {tab === 'about'   && <AboutTab   cmsAbout={cms.about}     saveSection={saveSection} showToast={showToast} />}
+          {tab === 'seo'     && <SeoTab     cmsSeo={cms.seo}         saveSection={saveSection} showToast={showToast} />}
+          {tab === 'banners' && <BannersTab cmsBanners={cms.banners} saveSection={saveSection} showToast={showToast} />}
         </div>
       </div>
 

@@ -193,12 +193,7 @@ export default function Dashboard() {
       sub:   `${recentEnq.filter(e => e.status === 'new').length} unread`,
       icon:  '📬', cls:'gold',  bg:'var(--gold-glow)',
     },
-    {
-      label: 'Featured Listings',
-      val:   s.featuredCount ?? 0,
-      sub:   'currently live',
-      icon:  '⭐', cls:'purp',  bg:'var(--purp-bg)',
-    },
+    
   ];
 
   // ─────────────────────────────────────────────────────────────────────────

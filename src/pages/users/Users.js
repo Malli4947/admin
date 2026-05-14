@@ -307,9 +307,9 @@ export default function Users() {
 
       {/* ── Filters ───────────────────────────────────── */}
       <div className="card" style={{ padding:'14px 18px' }}>
-        <div style={{ display:'flex', gap:10, flexWrap:'wrap', alignItems:'center' }}>
+        <div className="users-filters">
 
-          <div className="search-bar" style={{ flex:'1 1 200px', minWidth:180 }}>
+          <div className="search-bar users-filters__search">
             <span className="search-bar__icon">🔍</span>
             <input placeholder="Search name, email, phone…"
               value={search} onChange={e => setSearch(e.target.value)} />
@@ -319,7 +319,7 @@ export default function Users() {
             )}
           </div>
 
-          <select className="form-input form-select" style={{ width:155 }}
+          <select className="form-input form-select users-filters__sel"
             value={fRole} onChange={e => setFRole(e.target.value)}>
             <option value="">All Roles</option>
             <option value="user">User</option>
@@ -327,14 +327,14 @@ export default function Users() {
             <option value="superadmin">Super Admin</option>
           </select>
 
-          <select className="form-input form-select" style={{ width:160 }}
+          <select className="form-input form-select users-filters__sel"
             value={fActive} onChange={e => setFActive(e.target.value)}>
             <option value="">Active + Inactive</option>
             <option value="true">✅ Active Only</option>
             <option value="false">🔴 Inactive Only</option>
           </select>
 
-          <select className="form-input form-select" style={{ width:165 }}
+          <select className="form-input form-select users-filters__sel"
             value={sort} onChange={e => setSort(e.target.value)}>
             <option value="-createdAt">Newest First</option>
             <option value="createdAt">Oldest First</option>
@@ -343,7 +343,7 @@ export default function Users() {
             <option value="-lastLogin">Last Login</option>
           </select>
 
-          <span className="filter-count" style={{ marginLeft:'auto' }}>
+          <span className="filter-count users-filters__count">
             {loading ? '…' : `${total} user${total !== 1 ? 's' : ''}`}
           </span>
         </div>
@@ -523,8 +523,8 @@ export default function Users() {
 
       {/* ══ VIEW MODAL ════════════════════════════════════ */}
       {modal === 'view' && sel && (
-        <Modal title="👤 User Details" onClose={closeModal} style={{paddingTop:80}}>
-          <div className="modal__body" >
+        <Modal title="👤 User Details" onClose={closeModal}>
+          <div className="modal__body">
             <div className="user-view">
               <div className="user-view__av"
                 style={{ background: ROLE_AVATAR_BG[sel.role] || ROLE_AVATAR_BG.user }}>

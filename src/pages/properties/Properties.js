@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import api from '../../Utils/api';
+import api, { UPLOAD_BASE } from '../../Utils/api';
 import './Properties.css';
 
 // ── Constants ──────────────────────────────────────────────────
 const TYPES    = ['Residential','Commercial','Agriculture','Industrial','Luxury'];
 const STATUSES = ['For Sale','For Rent','For Lease','Sold','Rented'];
-const BADGES   = ['','Premium','Featured','Hot','New Launch','Commercial','Lease'];
+const BADGES   = ['','Premium','Featured','Hot','New Launch','Ready to Move','Pre Launch','Under Construction','Commercial','Lease','Rent'];
 const SUBTYPES = {
   Residential: ['Apartment','Villa','Row House','Duplex','Penthouse'],
   Commercial:  ['Office Space','Retail Shop','Showroom'],
@@ -33,17 +33,31 @@ const EMPTY_FORM = {
   'location.state':'Telangana','location.pincode':'',
   developer:'',possession:'',rera:'',badge:'',
   featured:false,isActive:true,amenities:'',images:[],
+  // New fields
+  acres:'',floors:'',totalUnits:'',minSft:'',maxSft:'',
+  unitType:'',pricePerSft:'',totalPrice:'',
 };
 
 // ── Modal ──────────────────────────────────────────────────────
 function Modal({ title, onClose, children, size='' }) {
   useEffect(() => {
+    // Lock background scroll
     document.body.style.overflow = 'hidden';
     return () => { document.body.style.overflow = ''; };
   }, []);
+
+  // Find the modal__body child and scroll it to top after mount
+  const wrapRef = React.useRef(null);
+  useEffect(() => {
+    if (wrapRef.current) {
+      const body = wrapRef.current.querySelector('.modal__body');
+      if (body) body.scrollTop = 0;
+    }
+  }, []);
+
   return (
     <div className="modal-overlay" onClick={e => { if(e.target===e.currentTarget) onClose(); }}>
-      <div className={`modal${size ? ` modal-${size}` : ''}`}>
+      <div className={`modal${size ? ` modal-${size}` : ''}`} ref={wrapRef}>
         <div className="modal__header">
           <span className="modal__title">{title}</span>
           <button className="modal__close" onClick={onClose}>✕</button>
@@ -216,7 +230,6 @@ export default function Properties() {
   const [editing,  setEditing]  = useState(null);
   const [form,     setForm]     = useState(EMPTY_FORM);
   const [imgInput, setImgInput] = useState('');
-  console.log('imageinput',imgInput);
 
   // ── Upload state
   const [uploading,       setUploading]       = useState(false);
@@ -230,9 +243,12 @@ export default function Properties() {
     try {
       const formData = new FormData();
       files.forEach(f => formData.append('images', f));
-      const res = await fetch('http://localhost:3000/api/upload/images', {
+      const token = localStorage.getItem('pp_admin_token');
+      const res = await fetch(`${UPLOAD_BASE}/api/upload/images`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${localStorage.getItem('pp_admin_token')}` },
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: formData,
       });
       const data = await res.json();
@@ -241,7 +257,7 @@ export default function Properties() {
         setForm(x => {
           const newImgs = data.images.map((img, i) => ({
             url:      img.url,
-            publicId: img.publicId,
+            publicId: img.publicId || '',
             isPrimary: x.images.length === 0 && i === 0,
             caption:  '',
           }));
@@ -343,6 +359,15 @@ export default function Properties() {
       isActive:    p.isActive !== undefined ? p.isActive : true,
       amenities:   Array.isArray(p.amenities) ? p.amenities.join(', ') : '',
       images:      Array.isArray(p.images) ? p.images : [],
+      // New fields
+      acres:       p.acres != null ? String(p.acres) : '',
+      floors:      p.floors != null ? String(p.floors) : '',
+      totalUnits:  p.totalUnits != null ? String(p.totalUnits) : '',
+      minSft:      p.minSft != null ? String(p.minSft) : '',
+      maxSft:      p.maxSft != null ? String(p.maxSft) : '',
+      unitType:    p.unitType || '',
+      pricePerSft: p.pricePerSft != null ? String(p.pricePerSft) : '',
+      totalPrice:  p.totalPrice != null ? String(p.totalPrice) : '',
     });
     setEditing(p); setImgInput(''); setModal('form');
   };
@@ -384,6 +409,15 @@ export default function Properties() {
       featured:   form.featured,
       isActive:   form.isActive,
       images:     form.images,
+      // New fields
+      acres:       form.acres       ? parseFloat(form.acres)       : null,
+      floors:      form.floors      ? parseInt(form.floors)        : null,
+      totalUnits:  form.totalUnits  ? parseInt(form.totalUnits)    : null,
+      minSft:      form.minSft      ? parseFloat(form.minSft)      : null,
+      maxSft:      form.maxSft      ? parseFloat(form.maxSft)      : null,
+      unitType:    form.unitType.trim() || null,
+      pricePerSft: form.pricePerSft ? parseFloat(form.pricePerSft) : null,
+      totalPrice:  form.totalPrice  ? parseFloat(form.totalPrice)  : null,
     };
 
     setSaving(true);
@@ -481,43 +515,43 @@ export default function Properties() {
       </div>
 
       {/* ── Filter bar ── */}
-      <div className="card" style={{padding:'16px 20px'}}>
-        <div style={{display:'flex',flexWrap:'wrap',gap:10,alignItems:'center'}}>
-          <div className="search-bar" style={{flex:'1 1 200px',minWidth:180}}>
+      <div className="card prop-filters">
+        <div className="prop-filters__row">
+          <div className="search-bar prop-filters__search">
             <span className="search-bar__icon">🔍</span>
             <input placeholder="Search title, locality, developer…" value={search}
               onChange={e => setSearch(e.target.value)} />
             {search && <button onClick={() => setSearch('')}
               style={{background:'none',border:'none',cursor:'pointer',color:'var(--t3)',fontSize:14}}>✕</button>}
           </div>
-          <select className="form-input form-select" style={{width:150}} value={fType} onChange={e=>setFType(e.target.value)}>
+          <select className="form-input form-select prop-filters__sel" value={fType} onChange={e=>setFType(e.target.value)}>
             <option value="">All Types</option>
             {TYPES.map(t=><option key={t} value={t}>{t}</option>)}
           </select>
-          <select className="form-input form-select" style={{width:150}} value={fStatus} onChange={e=>setFStatus(e.target.value)}>
+          <select className="form-input form-select prop-filters__sel" value={fStatus} onChange={e=>setFStatus(e.target.value)}>
             <option value="">All Status</option>
             {STATUSES.map(s=><option key={s} value={s}>{s}</option>)}
           </select>
-          <select className="form-input form-select" style={{width:140}} value={fBadge} onChange={e=>setFBadge(e.target.value)}>
+          <select className="form-input form-select prop-filters__sel" value={fBadge} onChange={e=>setFBadge(e.target.value)}>
             <option value="">All Badges</option>
             {BADGES.filter(Boolean).map(b=><option key={b} value={b}>{b}</option>)}
           </select>
-          <select className="form-input form-select" style={{width:160}}
+          <select className="form-input form-select prop-filters__sel"
             value={`${fPrice.min}|${fPrice.max}`}
             onChange={e=>{const[min,max]=e.target.value.split('|');setFPrice({min,max});}}>
             {PRICE_RANGES.map(r=><option key={r.label} value={`${r.min}|${r.max}`}>{r.label}</option>)}
           </select>
-          <select className="form-input form-select" style={{width:145}} value={fFeatured} onChange={e=>setFeatured(e.target.value)}>
+          <select className="form-input form-select prop-filters__sel" value={fFeatured} onChange={e=>setFeatured(e.target.value)}>
             <option value="">All: Featured</option>
             <option value="true">⭐ Featured Only</option>
             <option value="false">Not Featured</option>
           </select>
-          <select className="form-input form-select" style={{width:145}} value={fActive} onChange={e=>setFActive(e.target.value)}>
+          <select className="form-input form-select prop-filters__sel" value={fActive} onChange={e=>setFActive(e.target.value)}>
             <option value="">Active + Inactive</option>
             <option value="true">✅ Active Only</option>
             <option value="false">🔴 Inactive Only</option>
           </select>
-          <select className="form-input form-select" style={{width:170}} value={sort} onChange={e=>setSort(e.target.value)}>
+          <select className="form-input form-select prop-filters__sel" value={sort} onChange={e=>setSort(e.target.value)}>
             <option value="-createdAt">Newest First</option>
             <option value="createdAt">Oldest First</option>
             <option value="-price">Price: High → Low</option>
@@ -636,8 +670,8 @@ export default function Properties() {
 
       {/* ══ ADD / EDIT MODAL ════════════════════════════ */}
       {modal==='form' && (
-        <Modal title={editing?'✏️ Edit Property':'🏘️ Add New Property'} onClose={closeModal} size="lg" style={{paddingTop:60}}>
-          <div className="modal__body" style={{paddingTop:40}}>
+        <Modal title={editing?'✏️ Edit Property':'🏘️ Add New Property'} onClose={closeModal} size="lg">
+          <div className="modal__body">
             <div className="form-grid">
               <div className="form-group form-full">
                 <label className="form-label">Title *</label>
@@ -698,6 +732,61 @@ export default function Properties() {
                 <input className="form-input" placeholder="4,200 sq.ft"
                   value={f.area} onChange={e=>setForm(x=>({...x,area:e.target.value}))} />
               </div>
+
+              {/* ── Project Details ── */}
+              <div className="form-group form-full">
+                <div style={{fontSize:12,fontWeight:700,color:'var(--gold)',textTransform:'uppercase',letterSpacing:1,marginBottom:2}}>🏗️ Project Details</div>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Acres</label>
+                <input type="number" step="0.01" className="form-input" placeholder="e.g. 5.5"
+                  value={f.acres} onChange={e=>setForm(x=>({...x,acres:e.target.value}))} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Floors</label>
+                <input type="number" className="form-input" placeholder="e.g. 20"
+                  value={f.floors} onChange={e=>setForm(x=>({...x,floors:e.target.value}))} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Total Units</label>
+                <input type="number" className="form-input" placeholder="e.g. 240"
+                  value={f.totalUnits} onChange={e=>setForm(x=>({...x,totalUnits:e.target.value}))} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Unit Type</label>
+                <select className="form-input form-select" value={f.unitType}
+                  onChange={e=>setForm(x=>({...x,unitType:e.target.value}))}>
+                  <option value="">Select unit type</option>
+                  <option value="2 BHK">2 BHK</option>
+                  <option value="3 BHK">3 BHK</option>
+                  <option value="2 & 3 BHK">2 &amp; 3 BHK</option>
+                  <option value="1 BHK">1 BHK</option>
+                  <option value="4 BHK">4 BHK</option>
+                  <option value="Studio">Studio</option>
+                  <option value="Penthouse">Penthouse</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Minimum Sft</label>
+                <input type="number" className="form-input" placeholder="e.g. 1200"
+                  value={f.minSft} onChange={e=>setForm(x=>({...x,minSft:e.target.value}))} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Maximum Sft</label>
+                <input type="number" className="form-input" placeholder="e.g. 2400"
+                  value={f.maxSft} onChange={e=>setForm(x=>({...x,maxSft:e.target.value}))} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Price per Sft (₹)</label>
+                <input type="number" className="form-input" placeholder="e.g. 6500"
+                  value={f.pricePerSft} onChange={e=>setForm(x=>({...x,pricePerSft:e.target.value}))} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Total Price (₹)</label>
+                <input type="number" className="form-input" placeholder="e.g. 7800000"
+                  value={f.totalPrice} onChange={e=>setForm(x=>({...x,totalPrice:e.target.value}))} />
+              </div>
+
               <div className="form-group form-full">
                 <div style={{fontSize:12,fontWeight:700,color:'var(--gold)',textTransform:'uppercase',letterSpacing:1,marginBottom:2}}>📍 Location</div>
               </div>
@@ -758,7 +847,7 @@ export default function Properties() {
                   Property Images
                   {f.images.length > 0 && (
                     <span style={{marginLeft:8,fontSize:11,color:'var(--t3)',fontWeight:400}}>
-                      {f.images.length} uploaded
+                      {f.images.length} added
                     </span>
                   )}
                 </label>
@@ -775,7 +864,7 @@ export default function Properties() {
                   onDrop={e=>{e.preventDefault();if(!uploading)handleImageUpload({target:{files:e.dataTransfer.files,value:''}});}}>
                   <span style={{fontSize:32}}>{uploading?'⏳':'📁'}</span>
                   <span style={{fontSize:14,fontWeight:600,color:'var(--t1)'}}>
-                    {uploading?'Uploading…':'Click to select or drag & drop images'}
+                    {uploading?'Uploading…':'Click to browse or drag & drop images'}
                   </span>
                   <span style={{fontSize:12,color:'var(--t3)'}}>
                     JPEG, PNG, WEBP · Max 5 MB each · Multiple allowed
@@ -806,7 +895,7 @@ export default function Properties() {
                   </div>
                 )}
 
-                {/* ✅ Thumbnails grid — all uploaded images */}
+                {/* Thumbnails grid */}
                 {f.images.length > 0 && (
                   <div style={{marginTop:12,display:'flex',flexWrap:'wrap',gap:8}}>
                     {f.images.map((img,i) => (
@@ -814,7 +903,9 @@ export default function Properties() {
                         <img src={img.url} alt="" style={{
                           width:90,height:68,objectFit:'cover',borderRadius:10,
                           border:img.isPrimary?'2px solid var(--gold)':'1px solid var(--bdr2)',
-                        }}/>
+                        }}
+                        onError={e => { e.target.style.display='none'; }}
+                        />
                         {img.isPrimary && (
                           <span style={{
                             position:'absolute',top:3,left:3,
@@ -823,7 +914,7 @@ export default function Properties() {
                           }}>PRIMARY</span>
                         )}
                         {!img.isPrimary && (
-                          <button title="Set as primary"
+                          <button title="Set as primary" type="button"
                             onClick={()=>setForm(x=>({...x,images:x.images.map((im,j)=>({...im,isPrimary:j===i}))}))}
                             style={{
                               position:'absolute',bottom:3,left:3,
@@ -831,7 +922,7 @@ export default function Properties() {
                               border:'none',borderRadius:4,fontSize:9,padding:'2px 5px',cursor:'pointer',
                             }}>★ Set primary</button>
                         )}
-                        <button onClick={()=>removeImage(i)} style={{
+                        <button type="button" onClick={()=>removeImage(i)} style={{
                           position:'absolute',top:3,right:3,
                           background:'rgba(220,38,38,.85)',color:'#fff',
                           border:'none',borderRadius:'50%',
@@ -875,7 +966,7 @@ export default function Properties() {
       {/* ══ VIEW MODAL — with full image gallery ════════════════════════ */}
       {modal==='view' && editing && (
         <Modal title="👁 Property Details" onClose={closeModal} size="lg">
-          <div className="modal__body" style={{paddingTop:80,paddingBottom:20}}>
+          <div className="modal__body" style={{paddingBottom:20}}>
 
             {/* ✅ Image gallery — shows ALL images with prev/next + thumbnails */}
             <ImageGallery
@@ -899,23 +990,31 @@ export default function Properties() {
 
             <div className="view-grid">
               {[
-                ['Type',       editing.type],
-                ['Sub-type',   editing.subtype],
-                ['Status',     editing.status],
-                ['Price',      editing.priceLabel || `₹${(editing.price||0).toLocaleString('en-IN')}`],
-                ['Area',       editing.area],
-                ['Beds',       editing.beds ?? '—'],
-                ['Baths',      editing.baths ?? '—'],
-                ['Address',    editing.location?.address || '—'],
-                ['Locality',   editing.location?.locality || '—'],
-                ['City',       editing.location?.city || '—'],
-                ['Developer',  editing.developer || '—'],
-                ['Possession', editing.possession || '—'],
-                ['RERA',       editing.rera || '—'],
-                ['Views',      editing.views || 0],
-                ['Enquiries',  editing.enquiries || 0],
-                ['Featured',   editing.featured ? 'Yes ⭐' : 'No'],
-                ['Active',     editing.isActive ? 'Yes ✅' : 'No ❌'],
+                ['Type',          editing.type],
+                ['Sub-type',      editing.subtype],
+                ['Status',        editing.status],
+                ['Price',         editing.priceLabel || `₹${(editing.price||0).toLocaleString('en-IN')}`],
+                ['Area',          editing.area],
+                ['Beds',          editing.beds ?? '—'],
+                ['Baths',         editing.baths ?? '—'],
+                ['Acres',         editing.acres ?? '—'],
+                ['Floors',        editing.floors ?? '—'],
+                ['Total Units',   editing.totalUnits ?? '—'],
+                ['Unit Type',     editing.unitType || '—'],
+                ['Min Sft',       editing.minSft ? `${editing.minSft} sft` : '—'],
+                ['Max Sft',       editing.maxSft ? `${editing.maxSft} sft` : '—'],
+                ['Price/Sft',     editing.pricePerSft ? `₹${Number(editing.pricePerSft).toLocaleString('en-IN')}` : '—'],
+                ['Total Price',   editing.totalPrice ? `₹${Number(editing.totalPrice).toLocaleString('en-IN')}` : '—'],
+                ['Address',       editing.location?.address || '—'],
+                ['Locality',      editing.location?.locality || '—'],
+                ['City',          editing.location?.city || '—'],
+                ['Developer',     editing.developer || '—'],
+                ['Possession',    editing.possession || '—'],
+                ['RERA',          editing.rera || '—'],
+                ['Views',         editing.views || 0],
+                ['Enquiries',     editing.enquiries || 0],
+                ['Featured',      editing.featured ? 'Yes ⭐' : 'No'],
+                ['Active',        editing.isActive ? 'Yes ✅' : 'No ❌'],
               ].map(([k,v]) => (
                 <div key={k} className="view-row">
                   <span className="view-row__key">{k}</span>
@@ -943,7 +1042,7 @@ export default function Properties() {
       {/* ══ DELETE CONFIRM ══ */}
       {modal==='delete' && editing && (
         <Modal title="🗑️ Delete Property" onClose={closeModal}>
-          <div className="modal__body" style={{paddingTop:40}}>
+          <div className="modal__body" style={{paddingTop:24,textAlign:'center'}}>
             <div className="confirm-icon">🏚️</div>
             <div className="confirm-title">Delete "{editing.title}"?</div>
             <div className="confirm-sub">
