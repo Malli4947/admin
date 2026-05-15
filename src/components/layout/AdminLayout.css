@@ -86,6 +86,7 @@
 .topbar__right{display:flex;align-items:center;gap:8px;}
 .topbar__theme{display:flex;align-items:center;gap:6px;font-size:13px;padding:7px 12px;border-radius:10px;background:var(--bg3);border:1px solid var(--bdr2);color:var(--t2);font-weight:600;transition:all var(--t);}
 .topbar__theme:hover{background:var(--gold-glow);border-color:var(--gold-bdr);color:var(--gold);}
+.topbar__theme-label{font-size:12px;}
 
 /* ── Content ──────────────────────────────────── */
 .content{flex:1;padding:26px 26px 48px;overflow-x:hidden;}
@@ -97,38 +98,26 @@
   .mob-overlay{display:block;}
   .main-wrap{margin-left:0!important;}
   .topbar__burger{display:flex;}
-  .content{padding:18px 14px 48px;}
-}
-@media(max-width:480px){
-  .topbar{padding:0 14px;}
-  .topbar__home,.topbar__sep{display:none;}
-  .content{padding:14px 12px 48px;}
+  .content{padding:18px 16px 48px;}
 }
 
-/* ── Extra responsive helpers ──────────────────────────── */
-@media(max-width:900px){
-  .content{padding:16px 14px 48px;}
-  .page-header{flex-direction:column;gap:10px;align-items:flex-start;}
-  .page-header>div:last-child{width:100%;display:flex;flex-wrap:wrap;gap:8px;}
-}
 @media(max-width:640px){
   .topbar{padding:0 12px;}
-  .content{padding:12px 10px 48px;}
+  .content{padding:14px 12px 48px;}
   .table-wrap{border-radius:var(--r);}
   /* Hide less-important columns on small screens */
   table thead th:nth-child(6),
   table tbody td:nth-child(6){display:none;}
 }
+
 @media(max-width:480px){
+  .topbar{padding:0 10px;}
+  .topbar__home,.topbar__sep{display:none;}
+  .topbar__theme-label{display:none;}
+  .content{padding:12px 10px 48px;}
   .table-wrap table{font-size:12px;}
   .table-wrap th,.table-wrap td{padding:9px 10px;}
   .action-btns{gap:4px;}
   .act-btn{width:28px;height:28px;font-size:12px;}
   .badge{font-size:9px;padding:2px 6px;}
-  /* Stack page header buttons full-width */
-  .page-header{flex-direction:column;align-items:flex-start;}
-  .page-header>div:last-child{width:100%;}
-  .page-header .btn{flex:1;justify-content:center;}
-  /* Pagination compact */
-  .page-btn{width:30px;height:30px;font-size:12px;}
 }
