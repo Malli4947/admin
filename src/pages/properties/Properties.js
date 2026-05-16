@@ -1015,69 +1015,86 @@ export default function Properties() {
       {modal === 'view' && editing && (
         <Modal title="👁 Property Details" onClose={closeModal} size="lg">
           <div className="modal__body">
+
+            {/* Image gallery */}
             <ImageGallery images={editing.images} fallback={editing.image} />
 
-            <div style={{marginBottom:14}}>
+            {/* Title + badges */}
+            <div style={{marginBottom:18}}>
               <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginBottom:6}}>
-                <h3 style={{fontSize:17,fontWeight:800,color:'var(--t1)',margin:0}}>
+                <h3 style={{fontSize:18,fontWeight:800,color:'var(--t1)',margin:0,lineHeight:1.3}}>
                   {editing.title}
                 </h3>
                 {editing.badge && <span className="badge badge-gold">{editing.badge}</span>}
+                {editing.featured && <span className="badge badge-amber">⭐ Featured</span>}
                 {!editing.isActive && <span className="badge badge-red">Inactive</span>}
               </div>
-              <p style={{fontSize:13,color:'var(--t2)',lineHeight:1.65,margin:0}}>
-                {editing.description}
-              </p>
+              {editing.description && (
+                <p style={{fontSize:13,color:'var(--t2)',lineHeight:1.7,margin:0}}>
+                  {editing.description}
+                </p>
+              )}
             </div>
 
-            <div className="view-grid">
-              {[
-                ['Type',         editing.type],
-                ['Sub-type',     editing.subtype],
-                ['Status',       editing.status],
-                ['Project Status',editing.projectStatus || '—'],
-                ['Total Price',  editing.totalPrice || '—'],
-                ['Facing',       editing.facing || '—'],
-                ['Acres',        editing.acres ?? '—'],
-                ['Total Plots',  editing.totalPlots ?? '—'],
-                ['Plot Type',    editing.plotType || '—'],
-                ['Min SQY',      editing.minSqy ? `${editing.minSqy} SQY` : '—'],
-                ['Max SQY',      editing.maxSqy ? `${editing.maxSqy} SQY` : '—'],
-                ['Price/SQY',    editing.pricePerSqy ? `₹${Number(editing.pricePerSqy).toLocaleString('en-IN')}` : '—'],
-                ['Possession',   editing.plotPossession || editing.possession || '—'],
-                ['Floors',       editing.floors ?? '—'],
-                ['Total Units',  editing.totalUnits ?? '—'],
-                ['Unit Type',    editing.unitType || '—'],
-                ['Min Sft',      editing.minSft ? `${editing.minSft} sft` : '—'],
-                ['Max Sft',      editing.maxSft ? `${editing.maxSft} sft` : '—'],
-                ['Price/Sft',    editing.pricePerSft ? `₹${Number(editing.pricePerSft).toLocaleString('en-IN')}` : '—'],
-                ['Address',      editing.location?.address || '—'],
-                ['Locality',     editing.location?.locality || '—'],
-                ['City',         editing.location?.city || '—'],
-                ['Developer',    editing.developer || '—'],
-                ['RERA',         editing.rera || '—'],
-                ['Brochure',     editing.brochureLink || '—'],
-                ['Views',        editing.views || 0],
-                ['Enquiries',    editing.enquiries || 0],
-                ['Featured',     editing.featured ? 'Yes ⭐' : 'No'],
-                ['Active',       editing.isActive ? 'Yes ✅' : 'No ❌'],
-              ].map(([k,v]) => (
-                <div key={k} className="view-row">
-                  <span className="view-row__key">{k}</span>
-                  <span className="view-row__val">
-                    {k === 'Brochure' && v !== '—'
-                      ? <a href={v} target="_blank" rel="noreferrer"
-                          style={{color:'var(--gold)'}}>📄 View Brochure</a>
-                      : String(v)
-                    }
-                  </span>
+            {/* Details grid — only show rows that have real data */}
+            {(() => {
+              const rows = [
+                ['Type',           editing.type],
+                ['Sub-type',       editing.subtype],
+                ['Status',         editing.status],
+                ['Project Status', editing.projectStatus],
+                ['Total Price',    editing.totalPrice],
+                ['Facing',         editing.facing],
+                ['Acres',          editing.acres != null && editing.acres !== '' ? `${editing.acres} acres` : null],
+                ['Total Plots',    editing.totalPlots != null && editing.totalPlots !== '' ? editing.totalPlots : null],
+                ['Plot Type',      editing.plotType],
+                ['Min SQY',        editing.minSqy ? `${editing.minSqy} SQY` : null],
+                ['Max SQY',        editing.maxSqy ? `${editing.maxSqy} SQY` : null],
+                ['Price / SQY',    editing.pricePerSqy ? `₹${Number(editing.pricePerSqy).toLocaleString('en-IN')}` : null],
+                ['Possession',     editing.plotPossession || editing.possession],
+                ['Floors',         editing.floors != null && editing.floors !== '' ? editing.floors : null],
+                ['Total Units',    editing.totalUnits != null && editing.totalUnits !== '' ? editing.totalUnits : null],
+                ['Unit Type',      editing.unitType],
+                ['Min Sft',        editing.minSft ? `${editing.minSft} sft` : null],
+                ['Max Sft',        editing.maxSft ? `${editing.maxSft} sft` : null],
+                ['Price / Sft',    editing.pricePerSft ? `₹${Number(editing.pricePerSft).toLocaleString('en-IN')}` : null],
+                ['Address',        editing.location?.address],
+                ['Locality',       editing.location?.locality],
+                ['City',           editing.location?.city],
+                ['State',          editing.location?.state],
+                ['Pincode',        editing.location?.pincode],
+                ['Developer',      editing.developer],
+                ['RERA No.',       editing.rera],
+                ['Views',          editing.views || 0],
+                ['Enquiries',      editing.enquiries || 0],
+              ].filter(([, v]) => v !== null && v !== undefined && v !== '' && v !== '—');
+
+              return (
+                <div className="prop-view-grid">
+                  {rows.map(([k, v]) => (
+                    <div key={k} className="prop-view-row">
+                      <span className="prop-view-row__key">{k}</span>
+                      <span className="prop-view-row__val">{String(v)}</span>
+                    </div>
+                  ))}
+                  {/* Brochure — full width if present */}
+                  {editing.brochureLink && (
+                    <div className="prop-view-row prop-view-row--full">
+                      <span className="prop-view-row__key">Brochure</span>
+                      <a href={editing.brochureLink} target="_blank" rel="noreferrer"
+                        style={{color:'var(--gold)',fontWeight:700,fontSize:13}}>
+                        📄 View Brochure
+                      </a>
+                    </div>
+                  )}
                 </div>
-              ))}
-            </div>
+              );
+            })()}
 
+            {/* Amenities */}
             {editing.amenities?.length > 0 && (
-              <div style={{marginTop:14}}>
-                <div className="form-label" style={{marginBottom:8}}>Amenities</div>
+              <div style={{marginTop:16}}>
+                <div className="form-section-title" style={{marginBottom:10}}>🏊 Amenities</div>
                 <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
                   {editing.amenities.map(a => (
                     <span key={a} className="badge badge-blue">{a}</span>
@@ -1085,12 +1102,13 @@ export default function Properties() {
                 </div>
               </div>
             )}
+
           </div>
           <div className="modal__footer">
             <button className="btn btn-ghost" onClick={closeModal}>Close</button>
             <button className="btn btn-primary"
               onClick={() => { closeModal(); setTimeout(() => openEdit(editing), 50); }}>
-              ✏️ Edit
+              ✏️ Edit Property
             </button>
           </div>
         </Modal>

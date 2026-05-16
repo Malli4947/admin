@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import ReactDOM from 'react-dom';
 import api from '../../Utils/api';
 import './Enquiries.css';
 
@@ -31,7 +32,7 @@ function Modal({ title, onClose, children, size = '' }) {
     document.body.style.overflow = 'hidden';
     return () => { document.body.style.overflow = ''; };
   }, []);
-  return (
+  return ReactDOM.createPortal(
     <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
       <div className={`modal${size ? ` modal-${size}` : ''}`}>
         <div className="modal__header">
@@ -40,7 +41,8 @@ function Modal({ title, onClose, children, size = '' }) {
         </div>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -466,62 +468,70 @@ export default function Enquiries() {
           <div className="modal__body">
             <div className="enq-detail">
 
-              {/* Left column */}
+              {/* ── Left panel: contact card ── */}
               <div className="enq-detail__left">
                 <div className="enq-detail__av">
                   {sel.name?.charAt(0)?.toUpperCase() || '?'}
                 </div>
                 <div className="enq-detail__name">{sel.name}</div>
+                <span className={`badge ${STATUS_BADGE[sel.status] || 'badge-gold'}`}
+                  style={{ textTransform:'capitalize', marginTop:2 }}>
+                  {STATUS_ICONS[sel.status]} {sel.status}
+                </span>
 
+                {/* Contact links */}
                 <div className="enq-detail__contact">
-                  <a href={`mailto:${sel.email}`} className="enq-detail__link">
-                    ✉️ {sel.email}
-                  </a>
-                  <a href={`tel:${sel.phone}`} className="enq-detail__link">
-                    📞 {sel.phone}
-                  </a>
+                  {sel.email && (
+                    <a href={`mailto:${sel.email}`} className="enq-detail__link">
+                      ✉️ {sel.email}
+                    </a>
+                  )}
+                  {sel.phone && (
+                    <a href={`tel:${sel.phone}`} className="enq-detail__link">
+                      📞 {sel.phone}
+                    </a>
+                  )}
                 </div>
 
+                {/* Meta rows — only show if value exists */}
                 <div className="enq-detail__meta">
-                  <div className="enq-meta-row">
-                    <span>Type</span>
-                    <span className="badge badge-purple">{sel.type}</span>
-                  </div>
-                  <div className="enq-meta-row">
-                    <span>Status</span>
-                    <span className={`badge ${STATUS_BADGE[sel.status] || 'badge-gold'}`}
-                      style={{ textTransform: 'capitalize' }}>
-                      {sel.status}
-                    </span>
-                  </div>
-                  <div className="enq-meta-row">
-                    <span>Property</span>
-                    <span>{sel.property?.title || '—'}</span>
-                  </div>
+                  {sel.type && (
+                    <div className="enq-meta-row">
+                      <span>Type</span>
+                      <span className="badge badge-purple" style={{fontSize:10}}>{sel.type}</span>
+                    </div>
+                  )}
+                  {sel.property?.title && (
+                    <div className="enq-meta-row">
+                      <span>Property</span>
+                      <span style={{maxWidth:120,textAlign:'right',wordBreak:'break-word'}}>{sel.property.title}</span>
+                    </div>
+                  )}
                   {sel.scheduleDate && (
                     <div className="enq-meta-row">
                       <span>Visit Date</span>
-                      <span>{new Date(sel.scheduleDate).toLocaleDateString('en-IN')}</span>
+                      <span>{new Date(sel.scheduleDate).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})}</span>
                     </div>
                   )}
                   <div className="enq-meta-row">
                     <span>Received</span>
-                    <span>{new Date(sel.createdAt).toLocaleString('en-IN', {
-                      day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
-                    })}</span>
+                    <span>{new Date(sel.createdAt).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})}</span>
+                  </div>
+                  <div className="enq-meta-row">
+                    <span>Time</span>
+                    <span>{new Date(sel.createdAt).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}</span>
                   </div>
                 </div>
 
-                {/* Status buttons */}
-                <div style={{ width: '100%' }}>
-                  <div className="enq-qa__lbl" style={{ marginBottom: 8 }}>Update Status</div>
-                  <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+                {/* Status update */}
+                <div style={{width:'100%'}}>
+                  <div className="enq-qa__lbl">Update Status</div>
+                  <div style={{display:'flex',gap:5,flexWrap:'wrap'}}>
                     {STATUS_OPTIONS.map(s => (
                       <button key={s}
                         className={`btn btn-sm ${sel.status === s ? 'btn-primary' : 'btn-ghost'}`}
-                        style={{ textTransform: 'capitalize' }}
-                        onClick={() => updateStatus(sel._id, s)}
-                      >
+                        style={{textTransform:'capitalize',flex:'1 1 auto'}}
+                        onClick={() => updateStatus(sel._id, s)}>
                         {s}
                       </button>
                     ))}
@@ -529,57 +539,54 @@ export default function Enquiries() {
                 </div>
               </div>
 
-              {/* Right column */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              {/* ── Right panel: message + notes + actions ── */}
+              <div className="enq-detail__right">
+                {/* Message */}
                 <div className="enq-detail__msgbox">
                   <div className="enq-detail__msglbl">Message</div>
-                  <div className="enq-detail__msg">{sel.message}</div>
+                  <div className="enq-detail__msg">
+                    {sel.message || <span style={{color:'var(--t3)',fontStyle:'italic'}}>No message provided</span>}
+                  </div>
                 </div>
 
+                {/* Internal notes */}
                 <div className="form-group">
                   <label className="form-label">Internal Notes</label>
                   <textarea
                     className="form-input form-textarea"
                     rows={3}
-                    placeholder="Add internal notes — saved to backend…"
+                    placeholder="Add internal notes…"
                     value={notes}
                     onChange={e => setNotes(e.target.value)}
                   />
                 </div>
 
-                <div style={{ display: 'flex', gap: 8 }}>
+                {/* Quick-reply actions */}
+                <div className="enq-detail__actions">
                   <a
-                  href={`mailto:${sel.email}?subject=${encodeURIComponent('Re: Your Property Enquiry — PrimePro')}&body=${encodeURIComponent(
-      `Hi ${sel.name},\n\nThank you for your enquiry about "${sel.property?.title || 'our property'}".\n\nWe received your message:\n"${sel.message}"\n\nWe will get back to you shortly.\n\nBest regards,\nPrimePro Team`
-    )}`}
-    className="btn btn-ghost btn-sm"
-    style={{ flex: 1, justifyContent: 'center', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 6 }}
-    onClick={() => {
-      if (sel.status === 'new' || sel.status === 'read') {
-        updateStatus(sel._id, 'replied');
-      }
-    }}
+                    href={`mailto:${sel.email}?subject=${encodeURIComponent('Re: Your Property Enquiry — PrimePro')}&body=${encodeURIComponent(`Hi ${sel.name},\n\nThank you for your enquiry${sel.property?.title ? ` about "${sel.property.title}"` : ''}.\n\nWe will get back to you shortly.\n\nBest regards,\nPrimePro Team`)}`}
+                    className="btn btn-ghost btn-sm enq-detail__action-btn"
+                    onClick={() => { if (sel.status === 'new' || sel.status === 'read') updateStatus(sel._id, 'replied'); }}
                   >
                     ✉️ Reply Email
                   </a>
                   <a
-                    href={`https://wa.me/${sel.phone?.replace(/\D/g, '')}?text=${encodeURIComponent(
-    `Hi ${sel.name}, thank you for contacting PrimePro regarding "${sel.property?.title || 'your property enquiry'}". How can we help you?`
-  )}`}
-  target="_blank"
-  rel="noopener noreferrer"
-  className="btn btn-success btn-sm"
-  style={{ flex: 1, justifyContent: 'center', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 6 }}
-  onClick={() => {
-    if (sel.status === 'new' || sel.status === 'read') {
-      updateStatus(sel._id, 'replied');
-    }
-  }}
+                    href={`https://wa.me/${sel.phone?.replace(/\D/g,'')}?text=${encodeURIComponent(`Hi ${sel.name}, thank you for contacting PrimePro${sel.property?.title ? ` regarding "${sel.property.title}"` : ''}. How can we help you?`)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn btn-success btn-sm enq-detail__action-btn"
+                    onClick={() => { if (sel.status === 'new' || sel.status === 'read') updateStatus(sel._id, 'replied'); }}
                   >
                     💬 WhatsApp
                   </a>
+                  {sel.phone && (
+                    <a href={`tel:${sel.phone}`} className="btn btn-ghost btn-sm enq-detail__action-btn">
+                      📞 Call
+                    </a>
+                  )}
                 </div>
               </div>
+
             </div>
           </div>
 

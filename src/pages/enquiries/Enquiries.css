@@ -38,33 +38,54 @@
 }
 
 /* ── Detail modal layout ── */
-.enq-detail{display:grid;grid-template-columns:220px 1fr;gap:18px;}
+.enq-detail{display:grid;grid-template-columns:240px 1fr;gap:0;min-height:0;}
 .enq-detail__left{
-  border-right:1px solid var(--bdr);padding-right:18px;
+  border-right:1px solid var(--bdr);
+  padding:4px 20px 4px 4px;
   display:flex;flex-direction:column;align-items:center;text-align:center;gap:10px;
 }
-.enq-detail__av{
-  width:60px;height:60px;border-radius:50%;
-  background:linear-gradient(135deg,var(--gold),var(--gold-lt));
-  color:var(--navy);font-size:24px;font-weight:800;
-  display:flex;align-items:center;justify-content:center;
+.enq-detail__right{
+  padding:4px 4px 4px 20px;
+  display:flex;flex-direction:column;gap:14px;
+  min-height:0;
 }
-.enq-detail__name{font-size:16px;font-weight:700;color:var(--t1);}
+.enq-detail__av{
+  width:64px;height:64px;border-radius:50%;flex-shrink:0;
+  background:linear-gradient(135deg,var(--gold),var(--gold-lt));
+  color:var(--navy);font-size:26px;font-weight:800;
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 4px 16px rgba(201,168,76,.30);
+}
+.enq-detail__name{font-size:16px;font-weight:800;color:var(--t1);line-height:1.3;}
 .enq-detail__contact{display:flex;flex-direction:column;gap:6px;width:100%;}
 .enq-detail__link{
-  font-size:12px;color:var(--t2);display:flex;align-items:center;gap:5px;
-  padding:6px 10px;background:var(--bg2);border-radius:var(--r);
-  border:1px solid var(--bdr);transition:all var(--t);
+  font-size:12px;color:var(--t2);display:flex;align-items:center;gap:6px;
+  padding:7px 10px;background:var(--bg2);border-radius:var(--r);
+  border:1px solid var(--bdr);transition:all var(--t);text-decoration:none;
+  word-break:break-all;
 }
-.enq-detail__link:hover{color:var(--gold);border-color:var(--gold-bdr);}
-.enq-detail__meta{width:100%;display:flex;flex-direction:column;gap:6px;}
-.enq-meta-row{display:flex;justify-content:space-between;align-items:center;font-size:12px;}
-.enq-meta-row span:first-child{color:var(--t3);}
-.enq-meta-row span:last-child{color:var(--t1);font-weight:600;}
+.enq-detail__link:hover{color:var(--gold);border-color:var(--gold-bdr);background:var(--gold-glow);}
+.enq-detail__meta{
+  width:100%;display:flex;flex-direction:column;gap:0;
+  background:var(--bg2);border-radius:var(--r);border:1px solid var(--bdr);
+  overflow:hidden;
+}
+.enq-meta-row{
+  display:flex;justify-content:space-between;align-items:center;
+  font-size:12px;padding:8px 12px;border-bottom:1px solid var(--bdr);
+}
+.enq-meta-row:last-child{border-bottom:none;}
+.enq-meta-row span:first-child{color:var(--t3);font-weight:600;flex-shrink:0;}
+.enq-meta-row span:last-child{color:var(--t1);font-weight:700;text-align:right;}
 .enq-qa__lbl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--t3);margin-bottom:8px;}
-.enq-detail__msgbox{background:var(--bg2);border:1px solid var(--bdr);border-radius:var(--rl);padding:14px;}
+.enq-detail__msgbox{
+  background:var(--bg2);border:1px solid var(--bdr);border-radius:var(--rl);
+  padding:14px 16px;flex-shrink:0;
+}
 .enq-detail__msglbl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--t3);margin-bottom:8px;}
-.enq-detail__msg{font-size:14px;color:var(--t1);line-height:1.7;}
+.enq-detail__msg{font-size:14px;color:var(--t1);line-height:1.75;white-space:pre-wrap;word-break:break-word;}
+.enq-detail__actions{display:flex;gap:8px;flex-wrap:wrap;}
+.enq-detail__action-btn{flex:1 1 auto;justify-content:center;text-decoration:none;display:flex;align-items:center;gap:6px;}
 
 /* ── Responsive ── */
 @media(max-width:1024px){
@@ -75,8 +96,9 @@
   .enq-detail{grid-template-columns:1fr;}
   .enq-detail__left{
     border-right:none;border-bottom:1px solid var(--bdr);
-    padding-right:0;padding-bottom:14px;
+    padding-right:4px;padding-bottom:16px;
   }
+  .enq-detail__right{padding-left:4px;padding-top:16px;}
   .enq-filters__sel{flex:1 1 calc(50% - 5px);max-width:unset;}
   .enq-filters__search{flex:1 1 100%;}
   .enq-filters__count{margin-left:0;}
@@ -86,4 +108,6 @@
   .enq-sum-card{padding:12px 8px;}
   .enq-sum-card__count{font-size:22px;}
   .enq-filters__sel{flex:1 1 100%;max-width:unset;}
+  .enq-detail__actions{flex-direction:column;}
+  .enq-detail__action-btn{flex:unset;width:100%;}
 }

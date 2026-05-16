@@ -3,6 +3,33 @@
    Full responsiveness · Sticky modal footer · Gold/Navy
 ═══════════════════════════════════════════════════════ */
 
+/* ── Property view detail grid ── */
+.prop-view-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:6px;
+  margin-bottom:4px;
+}
+.prop-view-row{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:9px 13px;background:var(--bg2);border-radius:var(--r);
+  border:1px solid var(--bdr);gap:8px;
+}
+.prop-view-row--full{grid-column:1/-1;}
+.prop-view-row__key{
+  font-size:11px;font-weight:700;color:var(--t3);
+  text-transform:uppercase;letter-spacing:.5px;flex-shrink:0;
+}
+.prop-view-row__val{
+  font-size:13px;font-weight:700;color:var(--t1);
+  text-align:right;word-break:break-word;max-width:60%;
+}
+
+@media(max-width:640px){
+  .prop-view-grid{grid-template-columns:1fr;}
+  .prop-view-row--full{grid-column:unset;}
+}
+
 /* ── Property cell in table ── */
 .prop-cell{display:flex;align-items:center;gap:10px;}
 .prop-cell__img{
