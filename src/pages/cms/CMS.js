@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import api, { UPLOAD_BASE } from '../../Utils/api';
+import React, { useState, useEffect, useCallback } from 'react';
+import ReactDOM from 'react-dom';
+import api from '../../Utils/api';
 import './CMS.css';
 
 // ── Constants ─────────────────────────────────────────────────
@@ -39,7 +40,7 @@ function Modal({ title, onClose, children }) {
     document.body.style.overflow = 'hidden';
     return () => { document.body.style.overflow = ''; };
   }, []);
-  return (
+  return ReactDOM.createPortal(
     <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="modal">
         <div className="modal__header">
@@ -48,7 +49,8 @@ function Modal({ title, onClose, children }) {
         </div>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -69,105 +71,61 @@ function Toast({ msg, type = 'success', onClose }) {
   );
 }
 
-// ── Single Image Upload ───────────────────────────────────────
-function SingleImageUpload({ value, onChange, label = 'Image', inputId }) {
-  const [uploading, setUploading] = useState(false);
-  const [error,     setError]     = useState('');
+// ── Single Image URL Input ────────────────────────────────────
+function SingleImageUpload({ value, onChange, label = 'Image', inputId: _inputId }) {
+  const [draft, setDraft] = useState(value || '');
 
-  const handleFile = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (file.size > 10 * 1024 * 1024) { setError('File too large — max 10 MB'); e.target.value = ''; return; }
-    setError(''); setUploading(true);
-    try {
-      const formData = new FormData();
-      formData.append('image', file);
-      const res  = await fetch(`${UPLOAD_BASE}/api/upload/image`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${localStorage.getItem('pp_admin_token')}` },
-        body: formData,
-      });
-      const data = await res.json();
-      if (data.success) { onChange(data.url); }
-      else { setError(data.message || 'Upload failed'); }
-    } catch { setError('Network error — upload failed'); }
-    setUploading(false);
-    e.target.value = '';
+  useEffect(() => { if (!value) setDraft(''); }, [value]);
+
+  const commit = () => {
+    onChange(draft.trim());
   };
 
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
       <label className="form-label">{label}</label>
-      {value ? (
-        <div style={{ position:'relative', borderRadius:10, overflow:'hidden', border:'1px solid var(--bdr2)' }}>
+      {value && (
+        <div style={{ position:'relative', borderRadius:10, overflow:'hidden', border:'1px solid var(--bdr2)', marginBottom:4 }}>
           <img src={value} alt="preview" style={{ width:'100%', height:160, objectFit:'cover', display:'block' }} />
           <div className="img-overlay"
             onMouseEnter={e => e.currentTarget.style.opacity = 1}
             onMouseLeave={e => e.currentTarget.style.opacity = 0}>
-            <label htmlFor={inputId} className="img-overlay__btn img-overlay__btn--blue">
-              {uploading ? '⏳ Uploading…' : '🔄 Change'}
-            </label>
-            <button onClick={() => onChange('')} className="img-overlay__btn img-overlay__btn--red">✕ Remove</button>
+            <button onClick={() => { onChange(''); setDraft(''); }} className="img-overlay__btn img-overlay__btn--red">✕ Remove</button>
           </div>
         </div>
-      ) : (
-        <label htmlFor={inputId} className={`cms-upload-zone${uploading ? ' cms-upload-zone--busy' : ''}`}>
-          <span style={{ fontSize:28 }}>{uploading ? '⏳' : '📁'}</span>
-          <span style={{ fontSize:13, fontWeight:600, color:'var(--t1)' }}>{uploading ? 'Uploading…' : 'Click to upload'}</span>
-          <span style={{ fontSize:11, color:'var(--t3)' }}>JPEG · PNG · WEBP · Max 10 MB</span>
-        </label>
       )}
-      <input id={inputId} type="file" accept="image/*" style={{ display:'none' }} disabled={uploading} onChange={handleFile} />
-      {error && <span style={{ fontSize:12, color:'var(--red)' }}>❌ {error}</span>}
+      <div style={{ display:'flex', gap:8 }}>
+        <input
+          className="form-input"
+          placeholder="Paste image URL (https://…)"
+          value={draft}
+          onChange={e => setDraft(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); commit(); } }}
+          style={{ flex:1 }}
+        />
+        <button type="button" className="btn btn-ghost btn-sm" onClick={commit}>Apply</button>
+      </div>
+      <span style={{ fontSize:11, color:'var(--t3)' }}>Paste a direct image URL and press Enter or click Apply</span>
     </div>
   );
 }
 
-// ── Multi Image Upload (Hero slideshow) ───────────────────────
+// ── Multi Image URL Input (Hero slideshow) ────────────────────
 function MultiImageUpload({ images = [], onChange, label = 'Images', maxFiles = 10 }) {
-  const [uploading,  setUploading]  = useState(false);
-  const [progress,   setProgress]   = useState([]);
-  const [error,      setError]      = useState('');
-  const inputRef = useRef(null);
+  const [draft, setDraft] = useState('');
+  const [error, setError] = useState('');
 
-  // images = [{ url, publicId, isPrimary }]
-  const handleFiles = async (e) => {
-    const files = Array.from(e.target.files || []);
-    if (!files.length) return;
-    if (images.length + files.length > maxFiles) {
-      setError(`Max ${maxFiles} images allowed`); e.target.value = ''; return;
+  const addUrl = () => {
+    const url = draft.trim();
+    if (!url) return;
+    if (images.length >= maxFiles) {
+      setError(`Max ${maxFiles} images allowed`);
+      return;
     }
-    setError(''); setUploading(true);
-    setProgress(files.map(f => ({ name: f.name, status: 'uploading' })));
-    try {
-      const formData = new FormData();
-      files.forEach(f => formData.append('images', f));
-      formData.append('folder', 'cms');
-      const res  = await fetch(`${UPLOAD_BASE}/api/upload/images`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${localStorage.getItem('pp_admin_token')}` },
-        body: formData,
-      });
-      const data = await res.json();
-      if (data.success) {
-        setProgress(files.map(f => ({ name: f.name, status: 'done' })));
-        const newImgs = data.images.map((img, i) => ({
-          url:       img.url,
-          publicId:  img.publicId || null,
-          isPrimary: images.length === 0 && i === 0,
-        }));
-        onChange([...images, ...newImgs]);
-      } else {
-        setProgress(files.map(f => ({ name: f.name, status: 'error' })));
-        setError(data.message || 'Upload failed');
-      }
-    } catch {
-      setProgress(files.map(f => ({ name: f.name, status: 'error' })));
-      setError('Network error — upload failed');
-    }
-    setUploading(false);
-    setTimeout(() => setProgress([]), 2500);
-    e.target.value = '';
+    setError('');
+    const newImg = { url, publicId: null, isPrimary: images.length === 0 };
+    onChange([...images, newImg]);
+    setDraft('');
   };
 
   const remove = (idx) => {
@@ -183,13 +141,31 @@ function MultiImageUpload({ images = [], onChange, label = 'Images', maxFiles = 
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-        <label className="form-label">{label} {images.length > 0 && <span style={{ color:'var(--t3)', fontWeight:400 }}>({images.length}/{maxFiles})</span>}</label>
-        {images.length < maxFiles && (
-          <button type="button" className="btn btn-ghost btn-sm" onClick={() => inputRef.current?.click()} disabled={uploading}>
-            {uploading ? <><span className="spinner" style={{ width:12, height:12, borderWidth:2 }} /> Uploading…</> : '+ Add Images'}
-          </button>
-        )}
+        <label className="form-label">
+          {label} {images.length > 0 && <span style={{ color:'var(--t3)', fontWeight:400 }}>({images.length}/{maxFiles})</span>}
+        </label>
       </div>
+
+      {/* URL input row */}
+      {images.length < maxFiles && (
+        <div style={{ display:'flex', gap:8 }}>
+          <input
+            className="form-input"
+            placeholder="Paste image URL (https://…) and click Add"
+            value={draft}
+            onChange={e => { setDraft(e.target.value); setError(''); }}
+            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addUrl(); } }}
+            style={{ flex:1 }}
+          />
+          <button type="button" className="btn btn-ghost btn-sm" onClick={addUrl} disabled={!draft.trim()}>
+            + Add
+          </button>
+        </div>
+      )}
+      {error && <span style={{ fontSize:12, color:'var(--red)' }}>❌ {error}</span>}
+      <span style={{ fontSize:11, color:'var(--t3)', marginTop:-4 }}>
+        Paste a direct image URL and press Enter or click Add
+      </span>
 
       {/* Thumbnails grid */}
       {images.length > 0 && (
@@ -206,54 +182,12 @@ function MultiImageUpload({ images = [], onChange, label = 'Images', maxFiles = 
               </div>
             </div>
           ))}
-          {/* Add more slot */}
-          {images.length < maxFiles && (
-            <button type="button" className="cms-img-add" onClick={() => inputRef.current?.click()} disabled={uploading}>
-              <span style={{ fontSize:22 }}>+</span>
-              <span style={{ fontSize:11 }}>Add</span>
-            </button>
-          )}
         </div>
       )}
 
-      {/* Empty drop zone */}
-      {images.length === 0 && (
-        <label className={`cms-upload-zone${uploading ? ' cms-upload-zone--busy' : ''}`}
-          onClick={() => inputRef.current?.click()}>
-          <span style={{ fontSize:32 }}>{uploading ? '⏳' : '�️'}</span>
-          <span style={{ fontSize:13, fontWeight:600, color:'var(--t1)' }}>
-            {uploading ? 'Uploading…' : 'Click to upload hero images'}
-          </span>
-          <span style={{ fontSize:11, color:'var(--t3)' }}>
-            JPEG · PNG · WEBP · Up to {maxFiles} images · Max 10 MB each
-          </span>
-        </label>
-      )}
-
-      {/* Hidden input */}
-      <input ref={inputRef} type="file" accept="image/*" multiple style={{ display:'none' }} disabled={uploading} onChange={handleFiles} />
-
-      {/* Upload progress */}
-      {progress.length > 0 && (
-        <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
-          {progress.map((p, i) => (
-            <div key={i} style={{ display:'flex', alignItems:'center', gap:8, fontSize:12, color:'var(--t2)', background:'var(--bg3)', borderRadius:8, padding:'5px 10px' }}>
-              {p.status === 'uploading' && <span className="spinner" style={{ width:12, height:12, borderWidth:2 }} />}
-              {p.status === 'done'      && <span>✅</span>}
-              {p.status === 'error'     && <span>❌</span>}
-              <span style={{ flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{p.name}</span>
-              <span style={{ color: p.status === 'error' ? 'var(--red)' : 'var(--green)', fontWeight:600 }}>
-                {p.status === 'uploading' ? 'Uploading…' : p.status === 'done' ? 'Done' : 'Failed'}
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {error && <span style={{ fontSize:12, color:'var(--red)' }}>❌ {error}</span>}
       {images.length > 0 && (
         <p style={{ fontSize:11, color:'var(--t3)', margin:0 }}>
-          Click ★ on any image to set it as the primary (first shown). Drag to reorder is not supported — remove and re-add to change order.
+          Click ★ on any image to set it as the primary (first shown).
         </p>
       )}
     </div>

@@ -146,14 +146,17 @@ tbody td{padding:12px 16px;font-size:13px;color:var(--t1);}
  */
 .modal-overlay{
   position:fixed;
-  inset:0;
-  z-index:2000;
+  top:0;
+  left:0;
+  right:0;
+  bottom:0;
+  z-index:9999;
   background:rgba(0,0,0,.72);
   backdrop-filter:blur(8px);
   display:flex;
-  align-items:center;
+  align-items:flex-start;
   justify-content:center;
-  padding:20px 16px;
+  padding:24px 16px;
   overflow-y:auto;
   overflow-x:hidden;
   -webkit-overflow-scrolling:touch;
@@ -172,7 +175,7 @@ tbody td{padding:12px 16px;font-size:13px;color:var(--t1);}
   width:100%;
   max-width:560px;
   /* Grow to fit content but never exceed viewport */
-  max-height:calc(100vh - 40px);
+  max-height:calc(100vh - 48px);
   display:flex;
   flex-direction:column;
   box-shadow:var(--sh-lg);
@@ -180,11 +183,14 @@ tbody td{padding:12px 16px;font-size:13px;color:var(--t1);}
   overflow:hidden;
   /* Don't let the overlay shrink the modal */
   flex-shrink:0;
-  /* Sit at the top of the overlay flex when content is short */
+  /* Center vertically when content is short */
   margin:auto;
 }
 
-.modal-lg{ max-width:900px; }
+.modal-lg{
+  max-width:900px;
+  max-height:calc(100vh - 48px);
+}
 .modal-sm{ max-width:420px; }
 
 /* ── Header — never scrolls away ── */
@@ -336,15 +342,15 @@ tbody td{padding:12px 16px;font-size:13px;color:var(--t1);}
 ══════════════════════════════════════ */
 @media(max-width:768px){
   .modal-overlay{
-    padding:12px 10px;
-    align-items:flex-start;   /* let modal sit near top on mobile */
+    padding:10px 8px;
+    align-items:flex-start;
   }
   .modal{
-    max-height:calc(100vh - 24px);
+    max-height:calc(100vh - 20px);
     border-radius:var(--rl);
     margin:0 auto;
   }
-  .modal-lg{max-width:100%;}
+  .modal-lg{max-width:100%;max-height:calc(100vh - 20px);}
   .modal__header{border-radius:var(--rl) var(--rl) 0 0;padding:14px 18px;}
   .modal__body{padding:16px 18px;}
   .modal__footer{padding:12px 18px;gap:8px;}
@@ -354,11 +360,12 @@ tbody td{padding:12px 16px;font-size:13px;color:var(--t1);}
 }
 
 @media(max-width:480px){
-  .modal-overlay{padding:8px 6px;}
+  .modal-overlay{padding:6px 4px;}
   .modal{
-    max-height:calc(100vh - 16px);
+    max-height:calc(100vh - 12px);
     border-radius:var(--r);
   }
+  .modal-lg{max-height:calc(100vh - 12px);}
   .modal__header{border-radius:var(--r) var(--r) 0 0;padding:12px 14px;min-height:52px;}
   .modal__title{font-size:14px;}
   .modal__body{padding:14px 14px;}

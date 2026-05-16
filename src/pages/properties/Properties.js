@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import api, { UPLOAD_BASE } from '../../Utils/api';
+import ReactDOM from 'react-dom';
+import api from '../../Utils/api';
 import './Properties.css';
 
 // ── Constants ──────────────────────────────────────────────────
@@ -70,7 +71,7 @@ function Modal({ title, onClose, children, size='' }) {
     }
   }, []);
 
-  return (
+  return ReactDOM.createPortal(
     <div className="modal-overlay"
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
       <div className={`modal${size ? ` modal-${size}` : ''}`} ref={wrapRef}>
@@ -80,7 +81,8 @@ function Modal({ title, onClose, children, size='' }) {
         </div>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -185,46 +187,17 @@ export default function Properties() {
   const [editing, setEditing] = useState(null);
   const [form,    setForm]    = useState(EMPTY_FORM);
 
-  // Upload
-  const [uploading,      setUploading]      = useState(false);
-  const [uploadProgress, setUploadProgress] = useState([]);
+  // Upload — replaced with URL input
+  const [urlDraft, setUrlDraft] = useState('');
 
-  const handleImageUpload = async (e) => {
-    const files = Array.from(e.target.files);
-    if (!files.length) return;
-    setUploading(true);
-    setUploadProgress(files.map(f => ({ name: f.name, status: 'uploading' })));
-    try {
-      const fd = new FormData();
-      files.forEach(f => fd.append('images', f));
-      const token = localStorage.getItem('pp_admin_token');
-      const res = await fetch(`${UPLOAD_BASE}/api/upload/images`, {
-        method: 'POST',
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-        body: fd,
-      });
-      const data = await res.json();
-      if (data.success) {
-        setUploadProgress(files.map(f => ({ name: f.name, status: 'done' })));
-        setForm(x => {
-          const newImgs = data.images.map((img, i) => ({
-            url: img.url, publicId: img.publicId || '',
-            isPrimary: x.images.length === 0 && i === 0, caption: '',
-          }));
-          return { ...x, images: [...x.images, ...newImgs] };
-        });
-        showToast(`${data.images.length} image${data.images.length > 1 ? 's' : ''} uploaded!`);
-      } else {
-        setUploadProgress(files.map(f => ({ name: f.name, status: 'error' })));
-        showToast(data.message || 'Upload failed', 'error');
-      }
-    } catch {
-      setUploadProgress(files.map(f => ({ name: f.name, status: 'error' })));
-      showToast('Upload failed — check network', 'error');
-    }
-    setUploading(false);
-    setTimeout(() => setUploadProgress([]), 2500);
-    e.target.value = '';
+  const addImageUrl = () => {
+    const url = urlDraft.trim();
+    if (!url) return;
+    setForm(x => {
+      const newImg = { url, publicId: '', isPrimary: x.images.length === 0, caption: '' };
+      return { ...x, images: [...x.images, newImg] };
+    });
+    setUrlDraft('');
   };
 
   useEffect(() => { setPage(1); },
@@ -274,7 +247,7 @@ export default function Properties() {
     setFeatured(''); setFActive(''); setFPrice({ min:'', max:'' }); setPage(1);
   };
 
-  const openAdd  = () => { setForm(EMPTY_FORM); setEditing(null); setModal('form'); };
+  const openAdd  = () => { setForm(EMPTY_FORM); setEditing(null); setUrlDraft(''); setModal('form'); };
   const openEdit = (p) => {
     setForm({
       title:               p.title || '',
@@ -313,7 +286,7 @@ export default function Properties() {
       pricePerSqy:  p.pricePerSqy  != null ? String(p.pricePerSqy) : '',
       plotPossession: p.plotPossession || '',
     });
-    setEditing(p); setModal('form');
+    setEditing(p); setUrlDraft(''); setModal('form');
   };
   const openView   = (p) => { setEditing(p); setModal('view'); };
   const openDel    = (p) => { setEditing(p); setModal('delete'); };
@@ -957,44 +930,24 @@ export default function Properties() {
               <SectionTitle icon="🖼️" label="Property Images" />
 
               <div className="form-group form-full">
-                <label htmlFor="img-upload" className={`img-dropzone${uploading ? ' img-dropzone--loading' : ''}`}
-                  onDragOver={e => e.preventDefault()}
-                  onDrop={e => {
-                    e.preventDefault();
-                    if (!uploading) handleImageUpload({ target: { files: e.dataTransfer.files, value:'' }});
-                  }}>
-                  <span className="img-dropzone__icon">{uploading ? '⏳' : '📁'}</span>
-                  <span className="img-dropzone__title">
-                    {uploading ? 'Uploading…' : 'Click to browse or drag & drop images'}
-                  </span>
-                  <span className="img-dropzone__hint">JPEG, PNG, WEBP · Max 5 MB each · Multiple allowed</span>
-                  <input id="img-upload" type="file" accept="image/*" multiple
-                    style={{display:'none'}} disabled={uploading} onChange={handleImageUpload} />
-                </label>
-
-                {uploadProgress.length > 0 && (
-                  <div className="upload-progress-list">
-                    {uploadProgress.map((fp,i) => (
-                      <div key={i} className="upload-progress-item">
-                        <span>
-                          {fp.status === 'uploading' && (
-                            <span className="spinner" style={{width:12,height:12,borderWidth:2}} />
-                          )}
-                          {fp.status === 'done'  && '✅'}
-                          {fp.status === 'error' && '❌'}
-                        </span>
-                        <span className="upload-progress-item__name">{fp.name}</span>
-                        <span style={{
-                          color: fp.status === 'error' ? 'var(--red)' : 'var(--green)',
-                          fontWeight: 600, fontSize: 11,
-                        }}>
-                          {fp.status === 'uploading' ? 'Uploading…'
-                            : fp.status === 'done' ? 'Done' : 'Failed'}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                {/* URL input row */}
+                <div style={{ display:'flex', gap:8, marginBottom:10 }}>
+                  <input
+                    className="form-input"
+                    placeholder="Paste image URL (https://…) and click Add"
+                    value={urlDraft}
+                    onChange={e => setUrlDraft(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addImageUrl(); } }}
+                    style={{ flex:1 }}
+                  />
+                  <button type="button" className="btn btn-ghost btn-sm"
+                    onClick={addImageUrl} disabled={!urlDraft.trim()}>
+                    + Add
+                  </button>
+                </div>
+                <span style={{ fontSize:11, color:'var(--t3)', display:'block', marginBottom:10 }}>
+                  Paste a direct image URL and press Enter or click Add · Multiple images allowed
+                </span>
 
                 {f.images.length > 0 && (
                   <>

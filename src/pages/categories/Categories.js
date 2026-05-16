@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import ReactDOM from 'react-dom';
 import './Categories.css';
 
 // ── API base ──────────────────────────────────────────────────────────────────
-const BASE       = (process.env.REACT_APP_API_URL || 'http://localhost:3000').replace(/\/+$/, '');
-const UPLOAD_BASE = BASE;
-const TOKEN      = () => localStorage.getItem('pp_admin_token') || '';
+const BASE  = (process.env.REACT_APP_API_URL || 'http://localhost:3000').replace(/\/+$/, '');
+const TOKEN = () => localStorage.getItem('pp_admin_token') || '';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const COLORS = ['#3B82F6','#22C55E','#F59E0B','#8B5CF6','#EF4444','#C9A84C','#EC4899','#14B8A6','#6366F1','#F97316'];
@@ -22,7 +22,7 @@ function Modal({ title, onClose, children }) {
     }
     return () => { document.body.style.overflow = ''; };
   }, []);
-  return (
+  return ReactDOM.createPortal(
     <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="modal" ref={wrapRef}>
         <div className="modal__header">
@@ -31,7 +31,8 @@ function Modal({ title, onClose, children }) {
         </div>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -52,48 +53,48 @@ function Toast({ msg, type }) {
   );
 }
 
-// ── Image upload zone ─────────────────────────────────────────────────────────
-function ImageUploadZone({ value, onChange, uploading, onUpload }) {
-  const inputRef = useRef(null);
+// ── Image URL input ───────────────────────────────────────────────────────────
+function ImageUrlInput({ value, onChange }) {
+  const [draft, setDraft] = useState(value || '');
+
+  // Keep draft in sync when value is cleared externally
+  useEffect(() => { if (!value) setDraft(''); }, [value]);
+
+  const commit = () => {
+    const url = draft.trim();
+    onChange(url);
+  };
 
   return (
     <div className="cat-img-zone">
-      {/* Preview at top */}
       {value ? (
         <div className="cat-img-preview">
           <img src={value} alt="category" className="cat-img-preview__img" />
           <button
             type="button"
             className="cat-img-preview__remove"
-            onClick={() => onChange('')}
+            onClick={() => { onChange(''); setDraft(''); }}
             title="Remove image">
             ✕
           </button>
         </div>
-      ) : (
-        /* Drop / click zone */
-        <label
-          className={`cat-img-drop${uploading ? ' cat-img-drop--busy' : ''}`}
-          onDragOver={e => e.preventDefault()}
-          onDrop={e => {
-            e.preventDefault();
-            if (!uploading && e.dataTransfer.files[0]) onUpload(e.dataTransfer.files[0]);
-          }}>
-          <span className="cat-img-drop__icon">{uploading ? '⏳' : '🖼️'}</span>
-          <span className="cat-img-drop__text">
-            {uploading ? 'Uploading…' : 'Click to browse or drag & drop'}
-          </span>
-          <span className="cat-img-drop__hint">JPEG, PNG, WEBP · Max 5 MB</span>
-          <input
-            ref={inputRef}
-            type="file"
-            accept="image/*"
-            style={{ display:'none' }}
-            disabled={uploading}
-            onChange={e => { if (e.target.files[0]) onUpload(e.target.files[0]); e.target.value = ''; }}
-          />
-        </label>
-      )}
+      ) : null}
+      <div style={{ display:'flex', gap:8, marginTop: value ? 8 : 0 }}>
+        <input
+          className="form-input"
+          placeholder="Paste image URL (https://…)"
+          value={draft}
+          onChange={e => setDraft(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); commit(); } }}
+          style={{ flex:1 }}
+        />
+        <button type="button" className="btn btn-ghost btn-sm" onClick={commit}>
+          Apply
+        </button>
+      </div>
+      <span style={{ fontSize:11, color:'var(--t3)', marginTop:4, display:'block' }}>
+        Paste a direct image URL and press Enter or click Apply
+      </span>
     </div>
   );
 }
@@ -103,7 +104,6 @@ export default function Categories() {
   const [data,      setData]      = useState([]);
   const [loading,   setLoading]   = useState(true);
   const [saving,    setSaving]    = useState(false);
-  const [uploading, setUploading] = useState(false);
   const [modal,     setModal]     = useState(null);   // 'form' | 'delete' | null
   const [editing,   setEditing]   = useState(null);
   const [form,      setForm]      = useState(EMPTY);
@@ -142,28 +142,7 @@ export default function Categories() {
   );
 
   // ── Image upload ─────────────────────────────────────────────────────────────
-  const handleImageUpload = async (file) => {
-    setUploading(true);
-    try {
-      const fd = new FormData();
-      fd.append('images', file);
-      const res  = await fetch(`${UPLOAD_BASE}/api/upload/images`, {
-        method:  'POST',
-        headers: { Authorization: `Bearer ${TOKEN()}` },
-        body:    fd,
-      });
-      const data = await res.json();
-      if (data.success && data.images?.[0]?.url) {
-        setForm(x => ({ ...x, image: data.images[0].url }));
-        showToast('Image uploaded!');
-      } else {
-        showToast(data.message || 'Upload failed', 'error');
-      }
-    } catch {
-      showToast('Upload failed — check network', 'error');
-    }
-    setUploading(false);
-  };
+  // (replaced with URL input — no upload needed)
 
   // ── Open modals ─────────────────────────────────────────────────────────────
   const openAdd  = () => { setForm(EMPTY); setEditing(null); setModal('form'); };
@@ -449,14 +428,12 @@ export default function Categories() {
           <div className="modal__body">
             <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
 
-              {/* ── Image upload — shown at top ── */}
+              {/* ── Image URL — shown at top ── */}
               <div className="form-group">
                 <label className="form-label">Category Image</label>
-                <ImageUploadZone
+                <ImageUrlInput
                   value={f.image}
                   onChange={img => setForm(x => ({ ...x, image: img }))}
-                  uploading={uploading}
-                  onUpload={handleImageUpload}
                 />
               </div>
 
@@ -549,7 +526,7 @@ export default function Categories() {
             <button className="btn btn-ghost" onClick={() => setModal(null)} disabled={saving}>
               Cancel
             </button>
-            <button className="btn btn-primary" onClick={save} disabled={saving || uploading}>
+            <button className="btn btn-primary" onClick={save} disabled={saving}>
               {saving
                 ? <><span className="spinner" /> Saving…</>
                 : editing ? 'Save Changes' : 'Add Category'
